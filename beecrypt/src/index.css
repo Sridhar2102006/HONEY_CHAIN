@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { background: #FFFDF5; color: #17201A; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #DCD5BE; border-radius: 8px; }
+
+@keyframes bc-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.bc-pulse { animation: bc-pulse 1.6s ease-in-out infinite; }
+
+@keyframes bc-spin { to { transform: rotate(360deg); } }
+.bc-spin { animation: bc-spin 0.8s linear infinite; }
+
+.bc-honeycomb-bg {
+  background-image: radial-gradient(circle at 1px 1px, rgba(20,83,45,0.08) 1px, transparent 0);
+  background-size: 22px 22px;
+}
