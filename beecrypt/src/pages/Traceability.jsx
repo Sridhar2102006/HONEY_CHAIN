@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Search, Hexagon, Droplets, Factory, FlaskConical, ShieldCheck, QrCode, ChevronRight } from "lucide-react";
+import { useSearchParams, Link, useOutletContext } from "react-router-dom";
+import { 
+  Search, Hexagon, Droplets, Factory, FlaskConical, 
+  ShieldCheck, QrCode, ExternalLink, GitBranch, Sparkles 
+} from "lucide-react";
 import { useApp } from "../hooks/useApp.js";
 import PageHeader from "../components/PageHeader.jsx";
 import ProvenanceEventCard from "../components/ProvenanceEventCard.jsx";
@@ -9,112 +12,226 @@ import QRCodeCard from "../components/QRCodeCard.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import { getBatchTimeline } from "../services/provenanceService.js";
 import { childrenOf } from "../services/batchService.js";
-import { blockchainReadiness } from "../services/blockchainService.js";
-
-const JOURNEY_ICONS = {
-  HARVESTED: Hexagon,
-  EXTRACTED: Droplets,
-  PROCESSED: Factory,
-  QUALITY_TEST_REQUESTED: FlaskConical,
-  QUALITY_VERIFY: FlaskConical,
-  BATCH_SPLIT: Factory,
-  CERTIFICATE_ISSUED: ShieldCheck,
-  RETAIL_RECEIVE: QrCode,
-};
 
 export default function Traceability() {
   const { batches, batchRelationships, provenanceEvents, certificates } = useApp();
   const [params] = useSearchParams();
-  const [query, setQuery] = useState(params.get("batchId") || batches[0]?.batchId || "");
+  const outletContext = useOutletContext();
 
-  const batch = useMemo(() => batches.find((b) => b.batchId === query), [batches, query]);
-  const timeline = useMemo(() => getBatchTimeline(provenanceEvents, query), [provenanceEvents, query]);
-  const children = useMemo(() => childrenOf(batchRelationships, query), [batchRelationships, query]);
-  const cert = certificates.find((c) => c.batchId === query);
+  const [query, setQuery] = useState(
+    params.get("batchId") || batches[0]?.batchId || ""
+  );
+
+  const batch = useMemo(
+    () => batches.find((b) => b.batchId.toLowerCase() === query.trim().toLowerCase()),
+    [batches, query]
+  );
+  const timeline = useMemo(
+    () => getBatchTimeline(provenanceEvents, batch?.batchId || query),
+    [provenanceEvents, batch, query]
+  );
+  const children = useMemo(
+    () => childrenOf(batchRelationships, batch?.batchId || query),
+    [batchRelationships, batch, query]
+  );
+  const cert = certificates.find((c) => c.batchId === batch?.batchId);
   const lastEvent = timeline[timeline.length - 1];
 
   return (
-    <div>
-      <PageHeader title="Honey Traceability" sub="Search any batch to see its full hive-to-consumer journey." />
+    <div className="space-y-4">
+      <PageHeader
+        title="Honey Traceability"
+        sub="Search or scan any batch for its complete hive-to-shelf provenance trail."
+      />
 
-      <div className="flex gap-2.5 mb-6 max-w-md">
-        <div className="flex items-center bg-white border border-[#ECE6D6] rounded-xl px-3 py-2.5 flex-1">
-          <Search size={15} className="text-[#8A9086]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} className="border-none outline-none bg-transparent ml-2 text-sm w-full" placeholder="BEE-2026-001024" />
+      {/* Search Input with Scanner Button */}
+      <div className="flex gap-2">
+        <div className="flex-1 relative">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A9086]" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Enter Batch ID (e.g. BEE-2026-001024)..."
+            className="w-full pl-9 pr-4 py-2.5 bg-white rounded-2xl border border-[#ECE6D6] text-xs font-mono font-bold outline-none focus:border-bc-deep-green shadow-xs"
+          />
         </div>
+        <button
+          type="button"
+          onClick={() => outletContext?.openScanner?.()}
+          className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-bc-gold to-bc-amber text-white font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-transform"
+          title="Scan QR Code"
+        >
+          <QrCode size={16} />
+          <span className="hidden xs:inline">Scan</span>
+        </button>
+      </div>
+
+      {/* Quick Select Chips */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        <span className="text-[11px] text-[#8A9086] shrink-0 font-medium">Quick Batch:</span>
+        {batches.map((b) => (
+          <button
+            key={b.batchId}
+            type="button"
+            onClick={() => setQuery(b.batchId)}
+            className={`px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all shrink-0 ${
+              batch?.batchId === b.batchId
+                ? "bg-bc-deep-green text-white shadow-xs"
+                : "bg-white border border-[#ECE6D6] text-[#4B5548]"
+            }`}
+          >
+            {b.batchId}
+          </button>
+        ))}
       </div>
 
       {!batch ? (
-        <EmptyState title="No batch found" subtitle="Check the Batch ID and try again." />
+        <EmptyState
+          title="No batch found"
+          subtitle="Check the Batch ID or select one of the registered batches above."
+        />
       ) : (
-        <>
-          <div className="grid md:grid-cols-2 gap-3 mb-6">
-            <div className="bg-white rounded-2xl border border-[#ECE6D6] shadow-sm p-5 text-sm space-y-1.5">
-              {[
-                ["Producer", batch.producerName], ["Actor ID", batch.producerId], ["Hive", batch.hiveId],
-                ["Region", batch.region], ["Honey Type", batch.honeyType], ["Floral Source", batch.floralSource],
-                ["Harvest Date", batch.harvestDate], ["Quantity", `${batch.quantity} L`],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-[#ECE6D6] last:border-none py-1.5">
-                  <span className="text-[#8A9086]">{k}</span><span className="font-semibold">{v}</span>
+        <div className="space-y-4">
+          {/* Batch Primary Identity Card */}
+          <div className="bg-white rounded-3xl border border-[#ECE6D6] p-5 shadow-xs space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10.5px] font-bold text-[#8A9086] uppercase tracking-wider">
+                  Verified Batch Target
+                </span>
+                <h3 className="font-display font-bold text-xl text-bc-deep-green font-mono">
+                  {batch.batchId}
+                </h3>
+                <div className="text-xs text-[#6B7267] mt-0.5 font-semibold">
+                  {batch.honeyType} Honey · {batch.quantity} Litres
                 </div>
-              ))}
+              </div>
+
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                  batch.certStatus === "CERTIFIED"
+                    ? "bg-bc-light-green text-bc-success"
+                    : "bg-bc-light-honey text-bc-amber"
+                }`}
+              >
+                {batch.certStatus === "CERTIFIED" ? "✓ CERTIFIED" : "PENDING LAB"}
+              </span>
             </div>
-            <div className="bg-white rounded-2xl border border-[#ECE6D6] shadow-sm p-5 text-sm space-y-1.5">
-              {[
-                ["Processor", batch.processorId || "—"], ["Processing Method", batch.processingMethod || "—"],
-                ["Laboratory", batch.labId || "—"], ["Test Result", batch.testStatus],
-                ["Certificate", batch.certificateId || "Not yet issued"], ["Verification Status", batch.certStatus],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-[#ECE6D6] last:border-none py-1.5">
-                  <span className="text-[#8A9086]">{k}</span><span className="font-semibold">{v}</span>
-                </div>
-              ))}
+
+            {/* Key Data Grid */}
+            <div className="grid grid-cols-2 gap-2.5 py-2.5 border-t border-b border-[#F2EDE2] text-xs">
+              <div>
+                <span className="text-[#8A9086] text-[11px] block">Producer Apiary</span>
+                <span className="font-semibold text-bc-dark">{batch.producerName} (Hive {batch.hiveId})</span>
+              </div>
+              <div>
+                <span className="text-[#8A9086] text-[11px] block">Harvest Region</span>
+                <span className="font-semibold text-bc-dark">{batch.region}</span>
+              </div>
+              <div>
+                <span className="text-[#8A9086] text-[11px] block">Harvest Date</span>
+                <span className="font-semibold text-bc-dark">{batch.harvestDate}</span>
+              </div>
+              <div>
+                <span className="text-[#8A9086] text-[11px] block">Processing Method</span>
+                <span className="font-semibold text-bc-dark">{batch.processingMethod || "Cold Extraction"}</span>
+              </div>
+              <div>
+                <span className="text-[#8A9086] text-[11px] block">Testing Laboratory</span>
+                <span className="font-semibold text-bc-dark">{batch.labId || "Assigned"}</span>
+              </div>
+              <div>
+                <span className="text-[#8A9086] text-[11px] block">Purity Result</span>
+                <span className="font-bold text-bc-success">{batch.testStatus}</span>
+              </div>
+            </div>
+
+            {/* Consumer Verification Link */}
+            <div className="flex justify-end">
+              <Link
+                to={`/verify/${batch.batchId}`}
+                className="text-xs font-bold text-bc-deep-green flex items-center gap-1 hover:underline"
+              >
+                <span>View Public Consumer Verification</span>
+                <ExternalLink size={13} />
+              </Link>
             </div>
           </div>
 
-          {/* Batch relationship graph (Section 39) */}
+          {/* Batch Relationships / Splitting Tree (if split) */}
           {(batch.parentBatchId || children.length > 0) && (
-            <div className="mb-6">
-              <div className="font-bold text-sm mb-2.5">Batch Relationships</div>
-              <div className="bg-white rounded-2xl border border-[#ECE6D6] shadow-sm p-5 font-mono text-[13px]">
-                <div className="font-bold text-bc-deep-green">{batch.parentBatchId || batch.batchId}</div>
-                {(children.length > 0 ? children : [{ childBatchId: batch.batchId }]).map((c, i, arr) => (
-                  <div key={c.childBatchId} className="pl-4 mt-1">
-                    {i === arr.length - 1 ? "└──" : "├──"} {c.childBatchId}
-                  </div>
-                ))}
+            <div className="bg-white rounded-3xl border border-[#ECE6D6] p-4 shadow-xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#8A9086] uppercase tracking-wider mb-2">
+                <GitBranch size={14} className="text-bc-amber" />
+                <span>Batch Lineage &amp; Portioning</span>
+              </div>
+              <div className="bg-[#F8F6EC] p-3 rounded-2xl font-mono text-xs text-bc-deep-green space-y-1">
+                <div className="font-bold">
+                  {batch.parentBatchId || batch.batchId} (Parent Batch)
+                </div>
+                {(children.length > 0 ? children : [{ childBatchId: batch.batchId }]).map(
+                  (c, i, arr) => (
+                    <div key={c.childBatchId} className="pl-3.5 text-[#4B5548]">
+                      {i === arr.length - 1 ? "└── " : "├── "}
+                      <span className="font-bold text-bc-dark">{c.childBatchId}</span>
+                      {c.quantity && <span className="text-[#8A9086]"> ({c.quantity} L)</span>}
+                    </div>
+                  )
+                )}
               </div>
             </div>
           )}
 
-          <div className="font-bold text-sm mb-2.5 mt-2">Provenance Timeline</div>
-          <div className="flex flex-col gap-2.5 mb-6">
-            {timeline.length === 0 ? (
-              <EmptyState title="No events recorded yet" />
-            ) : (
-              timeline.map((e) => <ProvenanceEventCard key={e.eventId} event={e} />)
-            )}
+          {/* Provenance Journey Timeline */}
+          <div>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <h4 className="font-display font-bold text-base text-bc-deep-green">
+                Provenance Timeline ({timeline.length})
+              </h4>
+              <span className="text-[11px] text-[#8A9086]">Tap any event for details</span>
+            </div>
+
+            <div className="space-y-2.5">
+              {timeline.length === 0 ? (
+                <EmptyState title="No events recorded for this batch" />
+              ) : (
+                timeline.map((e) => (
+                  <ProvenanceEventCard key={e.eventId} event={e} />
+                ))
+              )}
+            </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <div className="font-bold text-sm mb-2.5">Blockchain Proof (Latest Event)</div>
-              <BlockchainProofCard event={lastEvent} />
-            </div>
-            <div>
-              <div className="font-bold text-sm mb-2.5">Consumer QR</div>
-              <div className="bg-white rounded-2xl border border-[#ECE6D6] shadow-sm p-5 flex flex-col items-center gap-3">
-                <QRCodeCard batchId={batch.batchId} />
-                {cert ? (
-                  <span className="text-xs font-bold text-bc-success">Certificate {cert.certificateId} — resolves to VERIFIED</span>
-                ) : (
-                  <span className="text-xs font-bold text-bc-amber">No certificate yet — resolves to NOT VERIFIED</span>
-                )}
-              </div>
-            </div>
+          {/* Provenance verification layer */}
+          <div>
+            <h4 className="font-display font-bold text-base text-bc-deep-green mb-2 px-1">
+              Provenance verification
+            </h4>
+            <BlockchainProofCard event={lastEvent} />
           </div>
-        </>
+
+          {/* Consumer QR Code Card */}
+          <div className="bg-white rounded-3xl border border-[#ECE6D6] p-5 shadow-xs text-center space-y-3">
+            <h4 className="font-display font-bold text-base text-bc-deep-green">
+              Product Consumer QR Seal
+            </h4>
+            <p className="text-xs text-[#8A9086] max-w-xs mx-auto">
+              Scanning this code in the retail aisle immediately confirms origin and test reports for consumers.
+            </p>
+
+            <div className="py-2 flex justify-center">
+              <QRCodeCard batchId={batch.batchId} size={150} />
+            </div>
+
+            <Link
+              to={`/verify/${batch.batchId}`}
+              className="inline-flex items-center justify-center gap-1.5 w-full py-3 rounded-2xl bg-gradient-to-r from-bc-forest to-bc-deep-green text-white font-bold text-xs shadow-xs active:scale-95 transition-transform"
+            >
+              <span>Test Consumer Verification Screen</span>
+              <ExternalLink size={14} />
+            </Link>
+          </div>
+        </div>
       )}
     </div>
   );

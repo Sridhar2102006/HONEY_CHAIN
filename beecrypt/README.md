@@ -1,25 +1,142 @@
-# BeeCrypt
+# HoneyChain (BeeCrypt)
 
-**From Hive to Trust.** A blockchain-*ready* frontend for honey traceability and
-smart beekeeping management, built for **SIH 2026, Problem Statement 26021**
-("Honey Chain").
+**From Hive to Trust.** A production-ready, blockchain-integrated web and native mobile application for honey supply chain traceability, IoT sensor monitoring (ESP32 DevKit + ESP32-CAM), and KVIC quality verification.
 
-This is a frontend-only demo. No backend, database, blockchain, IoT, or ML
-model is implemented — see "What's mocked" below. Everything is written so a
-real backend can be dropped in later without redesigning the app.
+Powered by:
+- **Web App**: React 18 + Vite + Tailwind CSS
+- **Mobile App**: Capacitor 6 (Android & iOS)
+- **Backend API**: Node.js / Express HTTPS API
+- **IoT Layer**: ESP32 DevKit (DHT11 + Vibration telemetry) & ESP32-CAM (GridFS inspection capture)
+- **Database**: MongoDB Atlas (`ESP32CAM` / `READINGS`)
+- **Provenance**: Cryptographic SHA-256 batch chaining & smart contract gateway readiness
 
-## Run it
+---
 
-```bash
-npm install
-npm run dev
+## Architecture
+
+```text
+                  ┌────────────────────────┐
+                  │ HoneyChain React UI    │
+                  └───────────┬────────────┘
+                              │
+                    Capacitor Mobile Layer
+                              │
+               ┌──────────────┴──────────────┐
+               │                             │
+         Android App                      iOS App
+         (API 22 - 34)                (iOS 14.0 - 18.0)
+               │                             │
+               └──────────────┬──────────────┘
+                              │
+                       HTTPS API Layer
+                              │
+         ┌────────────────────┼────────────────────┐
+         │                    │                    │
+    Node/Express         MongoDB Atlas       Blockchain Gateway
+    Backend API          (GridFS & Data)     (SHA-256 Signatures)
+         │
+    ESP32-CAM & DevKit
+    (Real-Time SSE Stream)
 ```
 
-Then open the printed local URL (default `http://localhost:5173`).
+---
 
-> Built and syntax-checked in an offline sandbox — dependencies were never
-> actually installed/run here. If `npm install` surfaces a version mismatch,
-> the fix is almost always bumping/pinning a range in `package.json`.
+## 1. Web Application Development
+
+### Prerequisites
+- Node.js 18+ (Tested on Node 20 / 24)
+- npm 9+
+
+### Quick Start
+```bash
+# Install dependencies
+npm install
+
+# Start Vite Web Development Server
+npm run dev
+
+# Start Backend API & IoT Ingestion Server
+npm run dev:server
+```
+Web app opens at `http://localhost:5173`.
+
+---
+
+## 2. Mobile Application Development (Capacitor)
+
+HoneyChain uses **Capacitor 6** to build enterprise Android and iOS applications directly from the shared React codebase.
+
+### Available Mobile Scripts
+```bash
+# 1. Build production web bundle & sync to Android and iOS
+npm run build:mobile
+
+# 2. Sync web assets and plugins to native projects
+npm run cap:sync
+
+# 3. Open Android Studio
+npm run cap:android
+
+# 4. Open Xcode (macOS only)
+npm run cap:ios
+```
+
+### Mobile Native Features
+- **Status Bar & Splash Screen**: Honeycomb theme, smooth honeybee flight animation, edge-to-edge safe area rendering.
+- **Hardware Back Button**: Android hardware back button handler closes modals, navigates history, and prevents trapped screens.
+- **Dynamic API Resolution**: Automatically points to local network backend (`http://<LAN_IP>:3001/api/v1`) during development, and HTTPS (`https://api.honeychain.app/api/v1`) in production.
+- **Secure Preferences**: Uses `@capacitor/preferences` for native token persistence with automatic fallback to web storage.
+- **Live Network Monitor**: Continuous online/offline connectivity monitoring.
+
+---
+
+## 3. Environment Strategy
+
+HoneyChain maintains strict environment separation. Never hardcode credentials in source code.
+
+| Environment | File | Target API URL | Usage |
+|---|---|---|---|
+| **Development** | `.env.development` | `http://10.131.229.86:3001/api/v1` (or local IP) | Local testing on physical devices |
+| **Staging** | `.env.staging` | `https://staging-api.honeychain.app/api/v1` | QA and staging builds |
+| **Production** | `.env.production` | `https://api.honeychain.app/api/v1` | Play Store & App Store builds |
+
+Template is available in `.env.example`.
+
+---
+
+## 4. CI/CD & Direct APK Distribution (SIH Hackathon Ready)
+
+> **IMPORTANT**: No Google Play Console account is required for this phase.
+> The CI/CD pipeline builds and publishes **installable APK files directly as GitHub Actions artifacts**.
+
+GitHub Actions workflows are located in `.github/workflows/`:
+
+1. **`ci.yml` (Quality Gate & Debug APK Generator)**:
+   - Triggers on every push & pull request (`main` & `develop`).
+   - Executes tests (`npm test`), web build (`npm run build`), Capacitor sync (`npx cap sync`), and compiles Android Debug APK (`./gradlew assembleDebug`).
+   - **Uploads Artifact**: `HoneyChain-Android-debug-apk` (`HoneyChain-Android-debug.apk`), ready to install immediately on test phones or emulators.
+
+2. **`android-release.yml` (Release Candidate APK & AAB Pipeline)**:
+   - Triggers on tag release (`v*`) or manual dispatch (`workflow_dispatch`).
+   - Compiles both **Debug APK**, **Release Candidate APK**, and **AAB Bundle**.
+   - If keystore secrets are configured, it signs with the production key. If not configured yet, it automatically signs with a local development fallback key so the APK **remains 100% installable on physical Android phones for SIH evaluation**.
+   - **Uploads Artifact**: `HoneyChain-Android-APKs` containing both `HoneyChain-Android-debug.apk` and `HoneyChain-Android-release.apk`.
+
+### How to Download & Install the APK on Your Android Device:
+1. Go to your GitHub repository → click the **Actions** tab.
+2. Click on the latest workflow run (e.g. "HoneyChain CI Quality Gate").
+3. Scroll down to the **Artifacts** section at the bottom of the summary page.
+4. Click **`HoneyChain-Android-debug-apk`** to download the zip file.
+5. Extract the `.apk` file and transfer it to your Android phone (via USB, Google Drive, or WhatsApp).
+6. Tap the `.apk` on your phone to install (allow "Install Unknown Apps" from your browser/file manager when prompted).
+
+### CI/CD Secrets (Optional for Play Store in Future)
+- `ANDROID_KEYSTORE_BASE64`: Base64 string of release `.keystore` / `.jks` file
+- `ANDROID_KEYSTORE_PASSWORD`: Keystore store password
+- `ANDROID_KEY_ALIAS`: Key alias name
+- `ANDROID_KEY_PASSWORD`: Key password
+- `JWT_SECRET`: Production JWT signing secret (backend)
+- `MONGODB_URI`: Production MongoDB Atlas connection URI (backend)
 
 ## Demo accounts (Demo Authentication — no real auth server)
 

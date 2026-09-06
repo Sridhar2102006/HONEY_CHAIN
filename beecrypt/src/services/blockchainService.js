@@ -15,21 +15,19 @@
  */
 
 export function prepareEvent(canonicalEvent) {
-  // Frontend just returns the event unchanged, clearly marked as pending.
+  // No gateway exists in this repository, so the state must remain explicit.
   return {
     ...canonicalEvent,
     payloadHash: null,
     previousEventHash: null,
     signature: null,
     blockchainTx: null,
-    status: "Integration Pending",
+    blockchainStatus: "NOT_CONNECTED",
   };
 }
 
 export function verifyProof(_batchId) {
-  // No real verification is possible without a backend + chain. Always
-  // reports "pending" from the frontend.
-  return { status: "Integration Pending" };
+  return { status: "BLOCKCHAIN_NOT_CONNECTED" };
 }
 
 export function blockchainReadiness(batches, events, certificates) {

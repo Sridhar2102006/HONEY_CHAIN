@@ -1,14 +1,18 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import Toast from "../components/Toast.jsx";
+import DeviceFrame from "../components/mobile/DeviceFrame.jsx";
 
-// Wraps the public/marketing + auth pages. Kept intentionally light —
-// each page (Landing/Login/Signup) controls its own full-bleed styling.
+/**
+ * PublicLayout wraps all public, auth, and onboarding flows.
+ * Uses DeviceFrame on desktop viewports to simulate native smartphone viewports
+ * (360, 375, 390, 412, 430px) and renders full-width directly on real mobile screens.
+ */
 export default function PublicLayout() {
   return (
-    <div className="min-h-screen bg-bc-cream">
+    <DeviceFrame>
       <Outlet />
       <Toast />
-    </div>
+    </DeviceFrame>
   );
 }

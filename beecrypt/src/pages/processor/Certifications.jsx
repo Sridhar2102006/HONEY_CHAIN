@@ -6,13 +6,25 @@ import { useApp } from "../../hooks/useApp.js";
 
 export default function Certifications() {
   const { certificates } = useApp();
+
   return (
-    <div>
-      <PageHeader title="Certifications" sub="Certificates issued by laboratories for your batches." />
-      <div className="flex flex-col gap-3.5">
-        {certificates.length === 0 ? <EmptyState title="No certificates yet" /> : certificates.map((c) => (
-          <CertificateCard key={c.certificateId} cert={c} />
-        ))}
+    <div className="space-y-3.5">
+      <PageHeader
+        title="Quality Certifications"
+        sub="Accredited laboratory purity certificates for your honey batches."
+      />
+
+      <div className="space-y-3">
+        {certificates.length === 0 ? (
+          <EmptyState
+            title="No certificates issued yet"
+            subtitle="Certificates issued by testing laboratories will appear here."
+          />
+        ) : (
+          certificates.map((c) => (
+            <CertificateCard key={c.certificateId} cert={c} />
+          ))
+        )}
       </div>
     </div>
   );

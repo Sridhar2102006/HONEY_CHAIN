@@ -2,18 +2,24 @@ import React from "react";
 
 export default function FilterBar({ options, active, onChange }) {
   return (
-    <div className="flex gap-2 flex-wrap mb-4">
-      {options.map((opt) => (
-        <button
-          key={opt}
-          onClick={() => onChange(opt)}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
-            active === opt ? "bg-bc-deep-green text-white" : "bg-[#F3F1E8] text-bc-dark hover:bg-[#EDE7D6]"
-          }`}
-        >
-          {opt}
-        </button>
-      ))}
+    <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar py-1 -mx-1 px-1">
+      {options.map((opt) => {
+        const isActive = active === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(opt)}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 shrink-0 shadow-xs ${
+              isActive
+                ? "bg-bc-deep-green text-white shadow-bc-deep-green/20"
+                : "bg-white border border-[#ECE6D6] text-[#6B7267] hover:bg-[#F8F6EC] hover:text-bc-dark"
+            }`}
+          >
+            {opt}
+          </button>
+        );
+      })}
     </div>
   );
 }

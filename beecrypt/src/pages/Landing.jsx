@@ -1,129 +1,182 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import {
-  Hexagon, Leaf, ArrowRight, QrCode, Activity, Sparkles, Droplets,
-  Factory, FlaskConical, ShieldCheck, ChevronRight,
+  Hexagon, ArrowRight, QrCode, Sparkles, Droplets,
+  Factory, FlaskConical, ShieldCheck, ChevronRight, CheckCircle2
 } from "lucide-react";
 
 const STEPS = [
-  { icon: Hexagon, label: "Harvested" },
-  { icon: Droplets, label: "Extracted" },
-  { icon: Factory, label: "Processed" },
-  { icon: FlaskConical, label: "Quality Verified" },
-  { icon: ShieldCheck, label: "Certificate Issued" },
-  { icon: QrCode, label: "QR Verification" },
+  { icon: Hexagon, label: "Harvested", sub: "Apiary ID" },
+  { icon: Droplets, label: "Extracted", sub: "Cold Extracted" },
+  { icon: Factory, label: "Processed", sub: "Clean Facility" },
+  { icon: FlaskConical, label: "Tested", sub: "NABL Purity" },
+  { icon: ShieldCheck, label: "Certified", sub: "AGMARK Seal" },
+  { icon: QrCode, label: "Verified", sub: "Consumer QR" },
 ];
 
-const SECTIONS = [
-  { icon: Hexagon, title: "Smart Beekeeping", body: "Simulated live hive data — temperature, humidity, vibration — plus AI-assisted health checks (demo)." },
-  { icon: Droplets, title: "Honey Traceability", body: "Every batch carries a permanent Batch ID from hive to shelf, with full parent/child batch relationships." },
-  { icon: FlaskConical, title: "Laboratory Verification", body: "Purity results, certification, and off-chain report storage, visible the moment they're issued." },
-  { icon: ShieldCheck, title: "Blockchain-Ready Provenance", body: "Every action becomes a canonical provenance event — ready for hashing, signing, and on-chain anchoring by a future backend." },
-  { icon: QrCode, title: "Consumer Verification", body: "A scan resolves to the Batch ID and shows a simple, honest verification result — nothing more, nothing fabricated." },
-  { icon: Activity, title: "One Account, Every Role", body: "A single approved user can switch between Beekeeper, Processor, and Laboratory workspaces without logging out." },
+const FEATURES = [
+  {
+    icon: Hexagon,
+    title: "Smart Beekeeping",
+    body: "Live telemetry (temperature, humidity, vibration) and AI-assisted colony diagnostics.",
+  },
+  {
+    icon: Droplets,
+    title: "Honey Traceability",
+    body: "Every harvest creates an immutable Batch ID linking hive boxes to consumer retail jars.",
+  },
+  {
+    icon: FlaskConical,
+    title: "Accredited Lab Testing",
+    body: "Enter chemical sugar profiles and issue certificates archived off-chain.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Integrated Provenance",
+    body: "Every event is prepared with deterministic hashes ready for distributed ledger anchoring.",
+  },
+  {
+    icon: QrCode,
+    title: "Consumer Verification",
+    body: "Consumers scan jar QR codes in supermarkets to verify pure origin in seconds.",
+  },
 ];
 
 export default function Landing() {
   return (
-    <div>
-      {/* NAV */}
-      <div className="sticky top-0 z-30 bg-bc-cream/90 backdrop-blur border-b border-[#ECE6D6]">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-display text-xl font-semibold text-bc-deep-green">
-            <Hexagon size={24} className="text-bc-deep-green" fill="#F59E0B" /> BeeCrypt
+    <div className="min-h-screen bg-[#FFFDF5] text-bc-dark flex flex-col">
+      {/* Mobile-First Sticky Header */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-[#ECE6D6] px-4 py-3">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2 font-display font-bold text-lg text-bc-deep-green">
+            <Hexagon size={22} fill="#F59E0B" className="text-bc-deep-green" />
+            <span>BeeCrypt</span>
           </div>
-          <div className="hidden md:flex gap-7 text-sm font-semibold">
-            <span className="cursor-pointer">How It Works</span>
-            <span className="cursor-pointer">Features</span>
-            <Link to="/verify/BEE-2026-001024" className="cursor-pointer">Verify Honey</Link>
-          </div>
-          <div className="flex gap-2.5">
-            <Link to="/login" className="rounded-xl px-4 py-2.5 text-sm font-bold hover:bg-[#F3F1E8]">Login</Link>
-            <Link to="/signup" className="rounded-xl px-4 py-2.5 text-sm font-bold text-white bg-gradient-to-br from-bc-gold to-bc-amber shadow-lg">Get Started</Link>
+
+          <div className="flex items-center gap-2">
+            <Link
+              to="/login"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-bc-deep-green hover:bg-[#F3F1E8] transition-colors"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/signup"
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-bc-gold to-bc-amber text-white text-xs font-bold shadow-xs active:scale-95 transition-transform"
+            >
+              Get Started
+            </Link>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* HERO */}
-      <div className="relative overflow-hidden px-6 pt-20 pb-16 bc-honeycomb-bg">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-bc-light-honey text-bc-amber font-bold text-xs px-3.5 py-1.5 rounded-full mb-5">
-              
-            </div>
-            <h1 className="font-display text-5xl leading-tight text-bc-deep-green font-semibold">From hive to trust.</h1>
-            <p className="text-lg text-[#4B5548] leading-relaxed mt-5 max-w-lg">
-              Smart beekeeping. Verified honey. Complete traceability. BeeCrypt connects beekeepers, processors,
-              laboratories, and consumers through one blockchain-ready honey ecosystem.
-            </p>
-            <div className="flex gap-3 mt-8">
-              <Link to="/signup" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white bg-gradient-to-br from-bc-gold to-bc-amber shadow-lg">
-                Get Started <ArrowRight size={16} />
-              </Link>
-              <Link to="/verify/BEE-2026-001024" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold border-2 border-bc-deep-green text-bc-deep-green">
-                <QrCode size={16} /> Verify Honey
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center justify-center h-80">
-            <svg viewBox="0 0 360 360" className="w-full max-w-sm">
-              <polygon points="180,50 260,95 260,185 180,230 100,185 100,95" fill="none" stroke="#14532D" strokeWidth="2" opacity="0.35" />
-              <polygon points="180,80 240,113 240,178 180,211 120,178 120,113" fill="#FEF3C7" opacity="0.6" />
-              <polygon points="180,80 240,113 240,178 180,211 120,178 120,113" fill="none" stroke="#D97706" strokeWidth="2" />
-              <circle cx="180" cy="145" r="26" fill="#F59E0B" opacity="0.9" />
-              <path d="M158 145 a22 22 0 1 1 44 0" fill="none" stroke="#14532D" strokeWidth="3" />
-              <ellipse cx="180" cy="300" rx="34" ry="42" fill="#D97706" />
-              <ellipse cx="180" cy="296" rx="26" ry="32" fill="#F59E0B" />
-              <path d="M60 260 Q 180 300 300 250" stroke="#22C55E" strokeWidth="1.5" strokeDasharray="4 6" fill="none" opacity="0.6" />
-            </svg>
+      {/* Hero Section */}
+      <main className="flex-1 max-w-md mx-auto w-full px-4 py-8 space-y-6">
+        <div className="text-center space-y-3">
+          <span className="inline-flex items-center gap-1.5 bg-bc-light-honey text-bc-amber text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+            <Sparkles size={13} /> Honey provenance platform
+          </span>
+
+          <h1 className="font-display font-bold text-3xl sm:text-4xl text-bc-deep-green leading-tight">
+            From Hive to Trust.
+          </h1>
+
+          <p className="text-xs sm:text-sm text-[#4B5548] leading-relaxed max-w-sm mx-auto">
+            Smart apiary monitoring, verified processing, and end-to-end provenance connecting beekeepers, processors, labs, and consumers.
+          </p>
+
+          {/* Hero CTAs */}
+          <div className="pt-2 flex flex-col sm:flex-row gap-2.5 max-w-xs mx-auto">
+            <Link
+              to="/login"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-bc-forest to-bc-deep-green text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
+            >
+              <span>Open Beekeeper App</span>
+              <ArrowRight size={15} />
+            </Link>
+
+            <Link
+              to="/traceability"
+              className="w-full py-3.5 rounded-2xl border-2 border-bc-deep-green text-bc-deep-green bg-white font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-xs"
+            >
+              <QrCode size={16} />
+              <span>Verify Honey Batch</span>
+            </Link>
           </div>
         </div>
-      </div>
 
-      {/* HOW IT WORKS */}
-      <div className="px-6 pb-20">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="font-display text-3xl text-bc-deep-green text-center mb-10">How BeeCrypt Works</h2>
-          <div className="flex flex-wrap gap-3.5 justify-center">
-            {STEPS.map((s, i) => (
-              <React.Fragment key={s.label}>
-                <div className="bg-white rounded-2xl border border-[#ECE6D6] shadow-sm p-4 w-32 text-center">
-                  <div className="w-10 h-10 rounded-xl bg-bc-light-honey flex items-center justify-center mx-auto mb-2.5">
-                    <s.icon size={20} className="text-bc-amber" />
-                  </div>
-                  <div className="text-xs font-bold">{s.label}</div>
+        {/* 6-Step Journey Pipeline Chips */}
+        <div className="bg-white rounded-3xl border border-[#ECE6D6] p-4 shadow-xs">
+          <div className="text-[11px] font-bold text-[#8A9086] uppercase tracking-wider mb-3 text-center">
+            Complete Honey Journey
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {STEPS.map((s, idx) => (
+              <div
+                key={s.label}
+                className="bg-[#FAF8F0] rounded-2xl p-2.5 text-center flex flex-col items-center justify-center border border-[#F0ECE0]"
+              >
+                <div className="w-8 h-8 rounded-xl bg-bc-light-honey text-bc-amber flex items-center justify-center mb-1">
+                  <s.icon size={16} />
                 </div>
-                {i < STEPS.length - 1 && <div className="self-center text-[#C9C2AC]"><ChevronRight size={18} /></div>}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* FEATURES */}
-      <div className="px-6 pb-24 bg-white">
-        <div className="max-w-6xl mx-auto pt-16">
-          <h2 className="font-display text-3xl text-bc-deep-green text-center mb-10">Built blockchain-ready, end to end</h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            {SECTIONS.map((f) => (
-              <div key={f.title} className="bg-bc-cream rounded-2xl border border-[#ECE6D6] p-6">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-bc-forest to-bc-deep-green flex items-center justify-center mb-4">
-                  <f.icon size={20} className="text-white" />
-                </div>
-                <div className="font-bold text-base mb-1.5">{f.title}</div>
-                <div className="text-sm text-[#6B7267] leading-relaxed">{f.body}</div>
+                <span className="text-[11px] font-bold text-bc-dark">{s.label}</span>
+                <span className="text-[9.5px] text-[#8A9086] truncate max-w-full">{s.sub}</span>
               </div>
             ))}
           </div>
         </div>
-      </div>
 
-      <div className="py-10 px-6 bg-bc-deep-green text-white text-center">
-        <div className="max-w-xl mx-auto">
-          <div className="font-display text-xl mb-1.5">Trust begins at the hive.</div>
-          <div className="text-sm opacity-75">BeeCrypt</div>
+        {/* Features List */}
+        <div className="space-y-3">
+          <div className="text-[11px] font-bold text-[#8A9086] uppercase tracking-wider px-1">
+            Core Platform Capabilities
+          </div>
+
+          {FEATURES.map((f) => (
+            <div
+              key={f.title}
+              className="bg-white rounded-2xl border border-[#ECE6D6] p-4 shadow-xs flex items-start gap-3"
+            >
+              <div className="w-9 h-9 rounded-xl bg-bc-light-green text-bc-forest flex items-center justify-center shrink-0 mt-0.5">
+                <f.icon size={18} />
+              </div>
+              <div>
+                <h4 className="font-display font-bold text-sm text-bc-deep-green">
+                  {f.title}
+                </h4>
+                <p className="text-xs text-[#6B7267] mt-0.5 leading-relaxed">
+                  {f.body}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+
+        {/* Demo Fast-Login Card */}
+        <div className="bg-gradient-to-br from-bc-deep-green to-bc-forest rounded-3xl p-5 text-white shadow-md text-center space-y-2">
+          <h3 className="font-display font-bold text-xl">Ready to test the ecosystem?</h3>
+          <p className="text-xs text-white/80 max-w-xs mx-auto">
+            Test as Beekeeper, Processor, Quality Laboratory, or KVIC Regulator with one tap.
+          </p>
+          <div className="pt-2">
+            <Link
+              to="/login"
+              className="inline-block w-full py-3 rounded-2xl bg-gradient-to-r from-bc-gold to-bc-amber text-bc-dark font-bold text-xs shadow-md active:scale-95 transition-transform"
+            >
+              Explore Demo Accounts
+            </Link>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-[#ECE6D6] py-6 px-4 text-center text-xs text-[#8A9086] bg-white">
+        <div className="max-w-md mx-auto space-y-1">
+          <div className="font-display font-bold text-bc-deep-green">BeeCrypt Mobile</div>
+          <div>SIH 2026 Problem Statement 26021 — Honey Traceability Platform</div>
+        </div>
+      </footer>
     </div>
   );
 }

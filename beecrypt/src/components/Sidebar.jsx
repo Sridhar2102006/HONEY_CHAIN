@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Hexagon, User as UserIcon, Settings as SettingsIcon, LogOut, X } from "lucide-react";
 import RoleSwitcher from "./RoleSwitcher.jsx";
 import { useAuth } from "../hooks/useAuth.js";
@@ -10,7 +10,8 @@ import { useAuth } from "../hooks/useAuth.js";
 const NAV_BY_ROLE = {
   beekeeper: [
     { to: "/app/beekeeper", label: "Dashboard", end: true },
-    { to: "/app/beekeeper/hives", label: "My Hives" },
+    { to: "/app/beekeeper/hive-management", label: "Hive Management" },
+    { to: "/app/beekeeper/hive-history", label: "Hive History", end: true },
     { to: "/app/beekeeper/monitoring", label: "Live Monitoring" },
     { to: "/app/beekeeper/ai-health", label: "AI Hive Health" },
     { to: "/app/beekeeper/alerts", label: "Alerts" },
@@ -32,6 +33,19 @@ const NAV_BY_ROLE = {
     { to: "/app/laboratory/certificates", label: "Certificates" },
     { to: "/app/traceability", label: "Traceability" },
   ],
+  retailer: [
+    { to: "/app/retailer", label: "Dashboard", end: true },
+    { to: "/app/retailer/inventory", label: "Store Inventory" },
+    { to: "/app/retailer/verify", label: "Intake Verification" },
+    { to: "/app/traceability", label: "Traceability" },
+  ],
+  verifier: [
+    { to: "/app/laboratory", label: "Dashboard", end: true },
+    { to: "/app/laboratory/requests", label: "Test Requests" },
+    { to: "/app/laboratory/purity", label: "Purity Analysis" },
+    { to: "/app/laboratory/certificates", label: "Certificates" },
+    { to: "/app/traceability", label: "Traceability" },
+  ],
   kvic: [
     { to: "/app/kvic", label: "Dashboard", end: true },
     { to: "/app/kvic/verification", label: "User Verification" },
@@ -43,7 +57,7 @@ const NAV_BY_ROLE = {
     { to: "/app/kvic/certifications", label: "Certifications" },
     { to: "/app/kvic/alerts", label: "Alerts" },
     { to: "/app/kvic/analytics", label: "Analytics" },
-    { to: "/app/kvic/readiness", label: "Blockchain Readiness" },
+    { to: "/app/kvic/readiness", label: "Provenance Infrastructure" },
     { to: "/app/traceability", label: "Traceability" },
   ],
 };
@@ -51,6 +65,7 @@ const NAV_BY_ROLE = {
 export default function Sidebar({ drawerOpen, closeDrawer }) {
   const { currentUser, workspace, switchWorkspace, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const nav = NAV_BY_ROLE[workspace] || [];
 
   const doLogout = () => {
@@ -59,8 +74,9 @@ export default function Sidebar({ drawerOpen, closeDrawer }) {
   };
 
   const handleSwitch = (role) => {
-    switchWorkspace(role);
-    navigate(`/app/${role}`);
+    const target = role === "verifier" ? "laboratory" : role;
+    switchWorkspace(target);
+    navigate(`/app/${target}`);
   };
 
   return (
@@ -80,21 +96,24 @@ export default function Sidebar({ drawerOpen, closeDrawer }) {
         <RoleSwitcher roles={currentUser.roles} workspace={workspace} onSwitch={handleSwitch} />
 
         <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto">
-          {nav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={closeDrawer}
-              className={({ isActive }) =>
-                `px-3 py-2.5 rounded-lg text-sm font-semibold ${
-                  isActive ? "bg-bc-light-honey text-bc-deep-green" : "text-[#4B5548] hover:bg-[#F8F6EC]"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {nav.map((item) => {
+            const isHiveDetail = item.to === "/app/beekeeper/hive-management" && location.pathname.startsWith("/app/beekeeper/hives/");
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={closeDrawer}
+                className={({ isActive }) =>
+                  `px-3 py-2.5 rounded-lg text-sm font-semibold ${
+                    isActive || isHiveDetail ? "bg-bc-light-honey text-bc-deep-green" : "text-[#4B5548] hover:bg-[#F8F6EC]"
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="border-t border-[#ECE6D6] pt-2 flex flex-col gap-0.5">

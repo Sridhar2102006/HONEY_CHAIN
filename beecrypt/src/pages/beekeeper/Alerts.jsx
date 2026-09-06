@@ -13,11 +13,23 @@ export default function Alerts({ hiveId, compact = false }) {
   if (filter !== "All") alerts = alerts.filter((a) => a.level === filter.toLowerCase());
 
   return (
-    <div>
-      {!compact && <PageHeader title="Alerts" sub="Stay ahead of hive conditions that need attention." />}
+    <div className="space-y-3.5">
+      {!compact && (
+        <PageHeader
+          title="Apiary Alerts"
+          sub="Real-time environmental and sensor condition notifications."
+        />
+      )}
       <FilterBar options={FILTERS} active={filter} onChange={setFilter} />
-      <div className="flex flex-col gap-2.5">
-        {alerts.length === 0 ? <EmptyState title="No alerts" /> : alerts.map((a) => <AlertCard key={a.alertId} alert={a} />)}
+      <div className="space-y-2.5">
+        {alerts.length === 0 ? (
+          <EmptyState
+            title="All systems normal"
+            subtitle="No critical or warning events detected for this apiary."
+          />
+        ) : (
+          alerts.map((a) => <AlertCard key={a.alertId} alert={a} />)
+        )}
       </div>
     </div>
   );

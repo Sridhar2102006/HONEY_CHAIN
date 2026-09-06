@@ -4,7 +4,27 @@
  */
 import { generateBatchId, generateChildBatchId } from "../utils/ids.js";
 
+export function validateBatchInput({ hiveId, harvestDate, quantity }) {
+  const errors = {};
+  const parsedQuantity = Number(quantity);
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (!hiveId || typeof hiveId !== "string") errors.hiveId = "A source hive is required.";
+  if (!harvestDate || harvestDate > today) errors.harvestDate = "Harvest date cannot be in the future.";
+  if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) errors.quantity = "Quantity must be greater than zero.";
+
+  return errors;
+}
+
 export function createBatch({ producerId, producerName, hiveId, region, honeyType, floralSource, harvestDate, quantity }) {
+  const errors = validateBatchInput({ hiveId, harvestDate, quantity });
+  if (Object.keys(errors).length > 0) {
+    const error = new Error("Batch validation failed.");
+    error.code = "VALIDATION_ERROR";
+    error.details = errors;
+    throw error;
+  }
+
   const batchId = generateBatchId();
   return {
     batchId,
@@ -30,6 +50,20 @@ export function createBatch({ producerId, producerName, hiveId, region, honeyTyp
 
 export function splitBatch(parentBatch, splits) {
   // splits: [{ suffix: "A", quantity }, { suffix: "B", quantity }]
+  if (!parentBatch || parentBatch.stage !== 3) {
+    throw new Error("Only a processed batch can be split.");
+  }
+  if (!Array.isArray(splits) || splits.length < 2) {
+    throw new Error("A split requires at least two child batches.");
+  }
+  const quantities = splits.map(({ quantity }) => Number(quantity));
+  if (quantities.some((quantity) => !Number.isFinite(quantity) || quantity <= 0)) {
+    throw new Error("Split quantities must be greater than zero.");
+  }
+  if (quantities.reduce((total, quantity) => total + quantity, 0) > Number(parentBatch.quantity)) {
+    throw new Error("Split quantities cannot exceed the parent batch quantity.");
+  }
+
   const relationships = [];
   const children = splits.map(({ suffix, quantity, reason }) => {
     const childBatchId = generateChildBatchId(parentBatch.batchId, suffix);

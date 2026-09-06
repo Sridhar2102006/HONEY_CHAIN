@@ -5,16 +5,15 @@ import NotificationPanel from "./NotificationPanel.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useApp } from "../hooks/useApp.js";
 import { initials } from "../utils/format.js";
-import { HIVES } from "../data/mockData.js";
 
 export default function Navbar({ onOpenDrawer }) {
   const { currentUser } = useAuth();
-  const { batches, notifications } = useApp();
+  const { batches, hives, notifications } = useApp();
   const [notifOpen, setNotifOpen] = useState(false);
 
   const searchIndex = [
-    ...batches.map((b) => ({ label: b.batchId, sublabel: `Batch · ${b.producerName}` })),
-    ...HIVES.map((h) => ({ label: h.hiveId, sublabel: `Hive · ${h.region}` })),
+    ...(batches || []).map((b) => ({ label: b.batchId, sublabel: `Batch • ${b.producerName || 'Beekeeper'}` })),
+    ...(hives || []).map((h) => ({ label: h.hiveId, sublabel: `Hive • ${h.region || h.block}` })),
   ];
   const unread = notifications.filter((n) => !n.read).length;
 

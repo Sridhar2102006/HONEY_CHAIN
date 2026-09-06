@@ -2,13 +2,15 @@ import React from "react";
 import PageHeader from "../../components/PageHeader.jsx";
 import DataTable from "../../components/DataTable.jsx";
 import StatusBadge from "../../components/StatusBadge.jsx";
-import { HIVES, ORGANIZATIONS } from "../../data/mockData.js";
+import { useApp } from "../../hooks/useApp.js";
+import { ORGANIZATIONS } from "../../data/mockData.js";
 
 export default function Beekeepers() {
+  const { hives } = useApp();
   const orgs = ORGANIZATIONS.filter((o) => o.type === "beekeeper" || o.type === "multi");
   const rows = orgs.map((o) => ({
     ...o,
-    hives: HIVES.filter((h) => h.region === o.region).length,
+    hives: (hives || []).filter((h) => h.region === o.region).length,
     status: "Active",
     lastActivity: "Today",
   }));
