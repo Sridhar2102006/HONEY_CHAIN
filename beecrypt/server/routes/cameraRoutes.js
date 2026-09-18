@@ -243,7 +243,7 @@ async function getMongoContext() {
     return { client: null, db: inMemoryMockDb, bucket: inMemoryBucket, captures: inMemoryCapturesStore };
   }
 
-  if (!uri || uri === 'inmemory') {
+  if (process.env.CI === 'true' || !uri || uri === 'inmemory') {
     inMemoryCapturesStore = new InMemoryCaptureStore();
     inMemoryBucket = new InMemoryGridFSBucket(inMemoryImageFiles);
     inMemoryMockDb = {

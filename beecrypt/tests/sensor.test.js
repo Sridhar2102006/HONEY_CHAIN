@@ -20,7 +20,11 @@ describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integ
   before(async () => {
     process.env.NODE_ENV = 'test';
     process.env.SENSOR_DEVICE_KEY = SENSOR_KEY;
-    process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://esp32_user:honeychain2026@esp32cluster.w7u0bdo.mongodb.net/?appName=ESP32Cluster';
+    if (process.env.CI === 'true' || process.env.MONGODB_URI === 'inmemory') {
+      process.env.MONGODB_URI = 'inmemory';
+    } else {
+      process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://esp32_user:honeychain2026@esp32cluster.w7u0bdo.mongodb.net/?appName=ESP32Cluster';
+    }
     process.env.MONGODB_DB = process.env.MONGODB_DB || 'ESP32CAM';
 
     authToken = generateToken({
@@ -30,19 +34,20 @@ describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integ
       email: 'beekeeper@beecrypt.demo',
     });
 
-    // Connect to MongoDB Atlas to verify schema and clean test docs (with fallback if in hermetic CI)
-    try {
-      mongoClient = new MongoClient(process.env.MONGODB_URI, {
-        connectTimeoutMS: 2000,
-        serverSelectionTimeoutMS: 2000,
-      });
-      await mongoClient.connect();
-      const collectionName = process.env.MONGODB_SENSOR_COLLECTION || 'READINGS';
-      readingsCollection = mongoClient.db(process.env.MONGODB_DB).collection(collectionName);
-    } catch (connErr) {
-      console.warn('[TEST] MongoDB Atlas unreachable in current environment, using route in-memory fallback:', connErr.message);
-      mongoClient = null;
-      readingsCollection = null;
+    if (process.env.MONGODB_URI !== 'inmemory') {
+      try {
+        mongoClient = new MongoClient(process.env.MONGODB_URI, {
+          connectTimeoutMS: 2000,
+          serverSelectionTimeoutMS: 2000,
+        });
+        await mongoClient.connect();
+        const collectionName = process.env.MONGODB_SENSOR_COLLECTION || 'READINGS';
+        readingsCollection = mongoClient.db(process.env.MONGODB_DB).collection(collectionName);
+      } catch (connErr) {
+        console.warn('[TEST] MongoDB Atlas unreachable in current environment, using route in-memory fallback:', connErr.message);
+        mongoClient = null;
+        readingsCollection = null;
+      }
     }
 
     // Spin up test server mounting sensorRoutes

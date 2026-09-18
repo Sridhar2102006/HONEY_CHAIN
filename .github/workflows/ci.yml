@@ -37,6 +37,12 @@ jobs:
 
       - name: Run Automated Test Suite (Hermetic & CI Ready)
         run: npm run test:ci
+        env:
+          CI: 'true'
+          NODE_ENV: test
+          MONGODB_URI: inmemory
+          ALLOW_TEST_LOOPBACK: 'true'
+          JWT_SECRET: test-jwt-secret-min-32-chars-0123456789abcdef
 
       - name: Build Web Application
         run: npm run build

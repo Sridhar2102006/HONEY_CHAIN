@@ -97,7 +97,7 @@ async function getMongoContext() {
     return { client: null, db: null, readings: inMemoryReadingsStore };
   }
 
-  if (!uri || uri === 'inmemory') {
+  if (process.env.CI === 'true' || !uri || uri === 'inmemory') {
     inMemoryReadingsStore = new InMemorySensorStore();
     return { client: null, db: null, readings: inMemoryReadingsStore };
   }
