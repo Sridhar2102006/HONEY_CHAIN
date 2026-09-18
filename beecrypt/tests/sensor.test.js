@@ -3,15 +3,13 @@ import assert from 'node:assert/strict';
 import express from '../server/node_modules/express/index.js';
 import cookieParser from '../server/node_modules/cookie-parser/index.js';
 import sensorRoutes, { closeSensorResources } from '../server/routes/sensorRoutes.js';
-import { MongoClient } from '../server/node_modules/mongodb/lib/index.js';
 import { generateToken } from '../server/middleware/auth.js';
+import { seedHiveAuthorization, removeHiveAuthorization } from '../server/db/pool.js';
 
 describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integration Tests', () => {
   let testApp;
   let testServer;
   let baseUrl;
-  let mongoClient;
-  let readingsCollection;
   let authToken;
   const SENSOR_KEY = 'beecrypt_sensor_secret_key_2026';
   const TEST_DEVICE_ID = 'ESP32-TEST-DEVKIT-01';
@@ -20,12 +18,15 @@ describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integ
   before(async () => {
     process.env.NODE_ENV = 'test';
     process.env.SENSOR_DEVICE_KEY = SENSOR_KEY;
-    if (process.env.CI === 'true' || process.env.MONGODB_URI === 'inmemory') {
-      process.env.MONGODB_URI = 'inmemory';
-    } else {
-      process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://esp32_user:honeychain2026@esp32cluster.w7u0bdo.mongodb.net/?appName=ESP32Cluster';
-    }
-    process.env.MONGODB_DB = process.env.MONGODB_DB || 'ESP32CAM';
+    process.env.MONGODB_URI = 'inmemory';
+    process.env.MONGODB_DB = 'ESP32CAM';
+
+    // Seed Hive Authorization record for sensor tests (H-TEST-99 owned by BK-001)
+    seedHiveAuthorization(TEST_HIVE_ID, 'BK-001', {
+      region: 'Erode',
+      block: 'Test Apiary — DevKit',
+      status: 'healthy',
+    });
 
     authToken = generateToken({
       id: 'usr_bk_01',
@@ -33,22 +34,6 @@ describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integ
       roles: ['beekeeper'],
       email: 'beekeeper@beecrypt.demo',
     });
-
-    if (process.env.MONGODB_URI !== 'inmemory') {
-      try {
-        mongoClient = new MongoClient(process.env.MONGODB_URI, {
-          connectTimeoutMS: 2000,
-          serverSelectionTimeoutMS: 2000,
-        });
-        await mongoClient.connect();
-        const collectionName = process.env.MONGODB_SENSOR_COLLECTION || 'READINGS';
-        readingsCollection = mongoClient.db(process.env.MONGODB_DB).collection(collectionName);
-      } catch (connErr) {
-        console.warn('[TEST] MongoDB Atlas unreachable in current environment, using route in-memory fallback:', connErr.message);
-        mongoClient = null;
-        readingsCollection = null;
-      }
-    }
 
     // Spin up test server mounting sensorRoutes
     testApp = express();
@@ -67,17 +52,7 @@ describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integ
   });
 
   after(async () => {
-    // Clean up test data
-    if (readingsCollection) {
-      try {
-        await readingsCollection.deleteMany({ deviceId: TEST_DEVICE_ID });
-      } catch {}
-    }
-    if (mongoClient) {
-      try {
-        await mongoClient.close();
-      } catch {}
-    }
+    removeHiveAuthorization(TEST_HIVE_ID);
     await closeSensorResources();
     if (testServer) {
       await new Promise((resolve) => testServer.close(resolve));
@@ -217,24 +192,16 @@ describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integ
     assert.equal(body.reading.vibration, false);
     assert.equal(body.reading.status, 'normal');
 
-    // Verify document in MongoDB (or via latest endpoint in hermetic fallback mode)
-    if (readingsCollection) {
-      const doc = await readingsCollection.findOne({ deviceId: TEST_DEVICE_ID });
-      assert.ok(doc, 'Document should exist in MongoDB');
-      assert.equal(doc.temperature, 29.4);
-      assert.equal(doc.humidity, 65.2);
-      assert.equal(doc.vibration, false);
-      assert.ok(doc.receivedAt instanceof Date, 'receivedAt must be UTC Date');
-    } else {
-      const latestRes = await fetch(`${baseUrl}/latest?hiveId=${TEST_HIVE_ID}&deviceId=${TEST_DEVICE_ID}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      assert.equal(latestRes.status, 200);
-      const latestBody = await latestRes.json();
-      assert.equal(latestBody.reading.temperature, 29.4);
-      assert.equal(latestBody.reading.humidity, 65.2);
-      assert.equal(latestBody.reading.vibration, false);
-    }
+    // Verify stored reading via authenticated endpoint
+    const latestRes = await fetch(`${baseUrl}/latest?hiveId=${TEST_HIVE_ID}&deviceId=${TEST_DEVICE_ID}`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    assert.equal(latestRes.status, 200);
+    const latestBody = await latestRes.json();
+    assert.equal(latestBody.success, true);
+    assert.equal(latestBody.reading.temperature, 29.4);
+    assert.equal(latestBody.reading.humidity, 65.2);
+    assert.equal(latestBody.reading.vibration, false);
   });
 
   test('5. Handles active vibration alert state correctly', async () => {
@@ -271,6 +238,16 @@ describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integ
 
     const resStream = await fetch(`${baseUrl}/stream?hiveId=${TEST_HIVE_ID}`);
     assert.equal(resStream.status, 401);
+  });
+
+  test('5c. Telemetry read endpoints reject requests for unauthorized hive with 403 (HC-007 IDOR guard)', async () => {
+    // H-2011 belongs to BK-045, whereas authToken is for BK-001
+    const res = await fetch(`${baseUrl}/latest?hiveId=H-2011`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.code, 'FORBIDDEN_HIVE_ACCESS');
   });
 
   test('6. GET /latest retrieves the newest sensor reading from MongoDB (authenticated)', async () => {

@@ -5,6 +5,7 @@ import express from '../server/node_modules/express/index.js';
 import cookieParser from '../server/node_modules/cookie-parser/index.js';
 import { generateToken } from '../server/middleware/auth.js';
 import cameraRoutes, { closeCameraResources } from '../server/routes/cameraRoutes.js';
+import { seedHiveAuthorization, removeHiveAuthorization } from '../server/db/pool.js';
 
 // Sample valid 134-byte minimal JPEG buffer
 const VALID_JPEG_BUFFER = Buffer.from(
@@ -24,6 +25,13 @@ describe('ESP32-CAM → Backend → MongoDB Integration Tests', () => {
   before(async () => {
     process.env.NODE_ENV = 'test';
     process.env.ALLOW_TEST_LOOPBACK = 'true';
+
+    // Seed Hive Authorization record for camera tests (H-1024 owned by BK-001)
+    seedHiveAuthorization('H-1024', 'BK-001', {
+      region: 'Erode',
+      block: 'Apiary A — Block 03',
+      status: 'healthy',
+    });
 
     // 1. Generate beekeeper test JWT
     beekeeperToken = generateToken({
@@ -86,11 +94,7 @@ describe('ESP32-CAM → Backend → MongoDB Integration Tests', () => {
 
     // 3. Point backend to mock camera
     process.env.ESP32_IP = `http://127.0.0.1:${mockPort}`;
-    if (process.env.CI === 'true' || process.env.MONGODB_URI === 'inmemory') {
-      process.env.MONGODB_URI = 'inmemory';
-    } else {
-      process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://esp32_user:honeychain2026@esp32cluster.w7u0bdo.mongodb.net/?appName=ESP32Cluster';
-    }
+    process.env.MONGODB_URI = process.env.MONGODB_URI || 'inmemory';
     process.env.MONGODB_DB = process.env.MONGODB_DB || 'ESP32CAM';
 
     // 4. Spin up ephemeral Express test app mounting cameraRoutes
@@ -110,6 +114,7 @@ describe('ESP32-CAM → Backend → MongoDB Integration Tests', () => {
   });
 
   after(async () => {
+    removeHiveAuthorization('H-1024');
     await closeCameraResources();
     if (testServer) {
       await new Promise((resolve) => testServer.close(resolve));
@@ -142,6 +147,21 @@ describe('ESP32-CAM → Backend → MongoDB Integration Tests', () => {
       body: JSON.stringify({ hiveId: 'H-1024' }),
     });
     assert.equal(res.status, 401);
+  });
+
+  test('3b. Capture photo rejects request for unauthorized hive with 403 (IDOR guard)', async () => {
+    // H-2011 belongs to BK-045, whereas beekeeperToken is BK-001
+    const res = await fetch(`${testServerUrl}/capture`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${beekeeperToken}`,
+      },
+      body: JSON.stringify({ hiveId: 'H-2011' }),
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.code, 'FORBIDDEN_HIVE_ACCESS');
   });
 
   let createdCaptureId = null;

@@ -97,7 +97,7 @@ async function getMongoContext() {
     return { client: null, db: null, readings: inMemoryReadingsStore };
   }
 
-  if (process.env.CI === 'true' || !uri || uri === 'inmemory') {
+  if (process.env.CI === 'true' || process.env.NODE_ENV === 'test' || !uri || uri === 'inmemory') {
     inMemoryReadingsStore = new InMemorySensorStore();
     return { client: null, db: null, readings: inMemoryReadingsStore };
   }
@@ -150,11 +150,12 @@ async function verifyHiveAuthorization(hiveId, user) {
   }
   try {
     const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
-    if (!rows[0]) {
-      // Allow during development/prototype if hive record not yet in relational DB
-      return process.env.NODE_ENV !== 'production';
+    if (!rows || rows.length === 0) {
+      // In development prototype without seed, allow fallback if specified
+      return process.env.NODE_ENV === 'development';
     }
-    return rows[0].producer_id === user.actorId;
+    const ownerId = rows[0].producer_id;
+    return ownerId === user.actorId || ownerId === user.multiActorIds?.beekeeper;
   } catch (err) {
     console.error('[SENSORS] Hive authorization lookup failed:', err.message);
     return false;

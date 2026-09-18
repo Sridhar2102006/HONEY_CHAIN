@@ -90,10 +90,12 @@ async function verifyHiveOwnership(hiveId, user) {
   }
   try {
     const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
-    if (!rows[0]) {
-      return process.env.NODE_ENV !== 'production';
+    if (!rows || rows.length === 0) {
+      // In development prototype without seed, allow fallback if specified
+      return process.env.NODE_ENV === 'development';
     }
-    return rows[0].producer_id === user.actorId;
+    const ownerId = rows[0].producer_id;
+    return ownerId === user.actorId || ownerId === user.multiActorIds?.beekeeper;
   } catch (err) {
     console.error('[CAMERA] Hive authorization lookup failed:', err.message);
     return false;
