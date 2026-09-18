@@ -233,7 +233,7 @@ export default function QRScannerModal({ isOpen, onClose }) {
                   </div>
                   <div className="flex justify-between py-1 border-b border-[#F5F2EA]">
                     <span className="text-[#8A9086]">Quantity</span>
-                    <span className="font-semibold">{scannedResult.data.quantity} Litres</span>
+                    <span className="font-semibold">{scannedResult.data.quantity} kg</span>
                   </div>
                   <div className="flex justify-between py-1">
                     <span className="text-[#8A9086]">Integrity Proof Status</span>

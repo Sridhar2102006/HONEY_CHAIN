@@ -54,6 +54,8 @@ export default function BlockchainProofCard({ event }) {
       <div className="px-4 pb-4">
         <button
           type="button"
+          aria-expanded={detailsExpanded}
+          aria-controls="verification-details-panel"
           onClick={() => setDetailsExpanded((prev) => !prev)}
           className="w-full py-2.5 px-3 rounded-xl bg-[#F8F6EC] hover:bg-[#F0ECE0] text-bc-dark text-xs font-bold flex items-center justify-between active:scale-[0.99] transition-all"
         >
@@ -66,7 +68,12 @@ export default function BlockchainProofCard({ event }) {
 
         {/* Technical Details Accordion */}
         {detailsExpanded && (
-          <div className="mt-3 p-3.5 bg-[#FBF9F4] rounded-xl border border-[#ECE6D6] space-y-1 text-xs animate-in fade-in duration-200">
+          <div
+            id="verification-details-panel"
+            role="region"
+            aria-label="Technical Verification Details"
+            className="mt-3 p-3.5 bg-[#FBF9F4] rounded-xl border border-[#ECE6D6] space-y-1 text-xs animate-in fade-in duration-200"
+          >
             <div className="text-[11px] font-bold text-[#8A9086] uppercase tracking-wider mb-2">
               Advanced verification details
             </div>
@@ -75,7 +82,7 @@ export default function BlockchainProofCard({ event }) {
             {row("Digital signature", event.signature || "Not available")}
             {row("Verification reference", event.blockchainTx || "Not available")}
             <p className="text-[10.5px] text-[#8A9086] mt-2 pt-2 border-t border-[#ECE6D6] italic">
-              Technical verification details will appear here when the provenance service is available.
+              Technical verification details will appear here when the blockchain gateway is connected.
             </p>
           </div>
         )}

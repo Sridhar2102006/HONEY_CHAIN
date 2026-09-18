@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { MongoClient } from 'mongodb';
+import { requireAuth } from '../middleware/auth.js';
+import { query as pgQuery } from '../db/pool.js';
 
 const router = Router();
 
@@ -40,6 +42,11 @@ async function getMongoContext() {
         await sensorReadingsCollection.createIndex({ deviceId: 1, receivedAt: -1 }).catch(() => {});
         await sensorReadingsCollection.createIndex({ hiveId: 1, receivedAt: -1 }).catch(() => {});
         await sensorReadingsCollection.createIndex({ receivedAt: -1 }).catch(() => {});
+        // HC-030: TTL index - automatically expire raw telemetry older than 90 days
+        await sensorReadingsCollection.createIndex(
+          { receivedAt: 1 },
+          { expireAfterSeconds: 90 * 24 * 60 * 60 }
+        ).catch(() => {});
 
         console.log(`[SENSORS] Connected to MongoDB Atlas (${dbName}) collection '${collectionName}'.`);
         return { client: mongoClient, db: sensorDb, readings: sensorReadingsCollection };
@@ -52,6 +59,27 @@ async function getMongoContext() {
   }
 
   return mongoInitPromise;
+}
+
+// HC-007: Verify hive authorization to prevent cross-tenant telemetry access
+async function verifyHiveAuthorization(hiveId, user) {
+  if (!hiveId) return true;
+  if (!user) return false;
+  const roles = user.roles || [];
+  if (roles.some((r) => ['kvic', 'admin', 'verifier'].includes(r))) {
+    return true;
+  }
+  try {
+    const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
+    if (!rows[0]) {
+      // Allow during development/prototype if hive record not yet in relational DB
+      return process.env.NODE_ENV !== 'production';
+    }
+    return rows[0].producer_id === user.actorId;
+  } catch (err) {
+    console.error('[SENSORS] Hive authorization lookup failed:', err.message);
+    return false;
+  }
 }
 
 // Device key authentication middleware
@@ -209,11 +237,23 @@ router.post('/telemetry', authenticateSensorDevice, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. GET /stream — Server-Sent Events (SSE) Real-Time Telemetry Channel
+// 2. GET /stream — Server-Sent Events (SSE) Real-Time Telemetry Channel (HC-007)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/stream', async (req, res) => {
+router.get('/stream', requireAuth, async (req, res) => {
   const hiveId = req.query.hiveId || null;
   const deviceId = req.query.deviceId || null;
+
+  // Verify hive ownership
+  if (hiveId) {
+    const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to subscribe to telemetry for this hive.',
+        code: 'FORBIDDEN_HIVE_ACCESS',
+      });
+    }
+  }
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -223,8 +263,9 @@ router.get('/stream', async (req, res) => {
     'Access-Control-Allow-Origin': '*',
   });
 
+  const isPrivileged = (req.user?.roles || []).some((r) => ['kvic', 'admin', 'verifier'].includes(r));
   // Client subscription handle
-  const client = { res, hiveId, deviceId };
+  const client = { res, hiveId, deviceId, user: req.user, isPrivileged, producerId: req.user?.actorId };
   sseClients.add(client);
 
   // Send initial connected event
@@ -269,10 +310,21 @@ router.get('/stream', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. GET /latest — Retrieve the latest telemetry reading from MongoDB
+// 3. GET /latest — Retrieve the latest telemetry reading from MongoDB (HC-007)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/latest', async (req, res) => {
+router.get('/latest', requireAuth, async (req, res) => {
   const { hiveId, deviceId } = req.query;
+
+  if (hiveId) {
+    const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to access telemetry for this hive.',
+        code: 'FORBIDDEN_HIVE_ACCESS',
+      });
+    }
+  }
 
   try {
     const { readings } = await getMongoContext();
@@ -304,11 +356,22 @@ router.get('/latest', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. GET /history — Retrieve chronological telemetry history for charts
+// 4. GET /history — Retrieve chronological telemetry history for charts (HC-007)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/history', async (req, res) => {
+router.get('/history', requireAuth, async (req, res) => {
   const { hiveId, deviceId } = req.query;
   const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+
+  if (hiveId) {
+    const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: You do not have permission to access telemetry history for this hive.',
+        code: 'FORBIDDEN_HIVE_ACCESS',
+      });
+    }
+  }
 
   try {
     const { readings } = await getMongoContext();

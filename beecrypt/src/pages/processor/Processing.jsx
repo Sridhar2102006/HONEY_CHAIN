@@ -91,7 +91,7 @@ export default function Processing() {
             </div>
           </div>
           <span className="font-display font-bold text-lg text-bc-amber">
-            {batch.quantity} L
+            {batch.quantity} kg
           </span>
         </div>
 
@@ -186,11 +186,11 @@ export default function Processing() {
 
             <div className="bg-[#F8F6EC] p-3 rounded-xl">
               <span className="text-[#8A9086]">Total Available to Split: </span>
-              <span className="font-bold text-bc-deep-green">{batch.quantity} Litres</span>
+              <span className="font-bold text-bc-deep-green">{batch.quantity} kg</span>
             </div>
 
             <div>
-              <label className="font-bold text-bc-dark block mb-1">Quantity for -A (Litres)</label>
+              <label className="font-bold text-bc-dark block mb-1">Quantity for -A (kg)</label>
               <input
                 type="number"
                 step="0.1"
@@ -202,7 +202,7 @@ export default function Processing() {
             </div>
 
             <div>
-              <label className="font-bold text-bc-dark block mb-1">Quantity for -B (Litres)</label>
+              <label className="font-bold text-bc-dark block mb-1">Quantity for -B (kg)</label>
               <input
                 type="number"
                 step="0.1"

@@ -22,6 +22,9 @@ describe('ESP32-CAM → Backend → MongoDB Integration Tests', () => {
   let mockMode = 'NORMAL'; // NORMAL | INVALID_JPEG | ERROR_500 | TIMEOUT
 
   before(async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.ALLOW_TEST_LOOPBACK = 'true';
+
     // 1. Generate beekeeper test JWT
     beekeeperToken = generateToken({
       id: 'usr_bk_01',

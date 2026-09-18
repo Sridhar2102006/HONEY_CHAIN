@@ -400,7 +400,7 @@ export default function HiveDetail() {
                 <div key={b.batchId} className="bg-white rounded-2xl border border-[#ECE6D6] p-3.5 shadow-xs flex justify-between items-center text-xs">
                   <div>
                     <div className="font-mono font-bold text-bc-deep-green">{b.batchId}</div>
-                    <div className="text-[#8A9086] mt-0.5">{b.harvestDate} · {b.quantity} Litres</div>
+                    <div className="text-[#8A9086] mt-0.5">{b.harvestDate} · {b.quantity} kg</div>
                   </div>
                   <Link
                     to={`/app/traceability?batchId=${b.batchId}`}

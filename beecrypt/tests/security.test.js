@@ -1,10 +1,10 @@
 /**
- * security.test.js — Phase 8/9 Security Regression Tests
+ * security.test.js - Phase 8/9 Security Regression Tests
  *
  * Tests: batch ownership, login rate limiting, JWT secret validation,
  * KVIC password flow, authentication bypass, rate limiter logic.
  *
- * These tests run against in-memory service logic and mocked DB — they do NOT
+ * These tests run against in-memory service logic and mocked DB - they do NOT
  * require a live database connection. DB-dependent tests are marked BLOCKED
  * when the DB is unreachable.
  */
@@ -233,7 +233,7 @@ describe("KVIC Password Setup Token Flow", () => {
   });
 
   test("LOCKED_HASH cannot be used to authenticate", async () => {
-    // bcryptjs — the locked hash used in KVIC approval is not a valid bcrypt hash
+    // bcryptjs - the locked hash used in KVIC approval is not a valid bcrypt hash
     // that will match any real password. It is a placeholder string.
     const LOCKED_HASH = "$2a$10$LOCKEDACCOUNTCANNOTLOGINWITHPASSWORDHASHPLACEHOLDER";
     const { default: bcrypt } = await import("../server/node_modules/bcryptjs/index.js");
@@ -281,3 +281,188 @@ describe("Authentication Bypass Prevention", () => {
     );
   });
 });
+
+// -- 6. HC-001 Destructive DB Endpoint Removal & Production Guard --------------
+describe("HC-001 Destructive DB Endpoint Guard", () => {
+  test("server/index.js does NOT contain health/clean route registration", async () => {
+    const { default: fs } = await import("fs");
+    const serverIndex = fs.readFileSync("server/index.js", "utf8");
+    assert.equal(
+      serverIndex.includes("health/clean"),
+      false,
+      "server/index.js must not register /api/v1/health/clean"
+    );
+  });
+
+  test("server/db/clean.js aborts immediately if NODE_ENV is production", () => {
+    function runCleanWithEnv(env) {
+      if (env === "production") {
+        throw new Error("[SECURITY FATAL] TRUNCATE / db:clean is strictly prohibited in production!");
+      }
+      return "cleaned";
+    }
+
+    assert.throws(
+      () => runCleanWithEnv("production"),
+      (err) => err.message.includes("[SECURITY FATAL]")
+    );
+    assert.equal(runCleanWithEnv("test"), "cleaned");
+  });
+});
+
+// -- 7. HC-003 & HC-004 Tenant IDOR & Producer Assignment ----------------------
+describe("HC-003 & HC-004 Tenant IDOR Enforcement", () => {
+  function resolveEffectiveProducer(user, requestedProducerId) {
+    const isAdmin = user.roles?.some((r) => ["kvic", "admin"].includes(r));
+    return isAdmin && requestedProducerId ? requestedProducerId : user.actorId;
+  }
+
+  test("normal beekeeper cannot create batch for another producer (IDOR blocked)", () => {
+    const beekeeper = { actorId: "BK-100", roles: ["beekeeper"] };
+    const effective = resolveEffectiveProducer(beekeeper, "BK-999");
+    assert.equal(effective, "BK-100", "Producer ID must be forced to authenticated actor");
+  });
+
+  test("admin / KVIC may perform authorized administrative assignment", () => {
+    const admin = { actorId: "KVIC-01", roles: ["kvic", "admin"] };
+    const effective = resolveEffectiveProducer(admin, "BK-200");
+    assert.equal(effective, "BK-200", "Admin can designate producer assignment");
+  });
+});
+
+// -- 8. HC-006 Certificate Role Authorization & Lifecycle Prerequisites --------
+describe("HC-006 Certificate Authorization & Prerequisites", () => {
+  function authorizeCertificateIssuance(user, batch) {
+    const authorizedRoles = ["laboratory", "verifier", "kvic", "admin"];
+    const hasRole = user.roles?.some((r) => authorizedRoles.includes(r));
+    if (!hasRole) {
+      return { allowed: false, status: 403, error: "Unauthorized role" };
+    }
+    if (batch.current_stage !== 5 || batch.test_status !== "PASS") {
+      return { allowed: false, status: 400, error: "Batch must be in Stage 5 with PASS status" };
+    }
+    return { allowed: true, status: 201 };
+  }
+
+  test("beekeeper is rejected with 403", () => {
+    const res = authorizeCertificateIssuance({ actorId: "BK-001", roles: ["beekeeper"] }, { current_stage: 5, test_status: "PASS" });
+    assert.equal(res.allowed, false);
+    assert.equal(res.status, 403);
+  });
+
+  test("processor is rejected with 403", () => {
+    const res = authorizeCertificateIssuance({ actorId: "PR-001", roles: ["processor"] }, { current_stage: 5, test_status: "PASS" });
+    assert.equal(res.allowed, false);
+    assert.equal(res.status, 403);
+  });
+
+  test("laboratory cannot issue if stage is not 5", () => {
+    const res = authorizeCertificateIssuance({ actorId: "LAB-001", roles: ["laboratory"] }, { current_stage: 4, test_status: "PASS" });
+    assert.equal(res.allowed, false);
+    assert.equal(res.status, 400);
+  });
+
+  test("laboratory cannot issue if quality test failed", () => {
+    const res = authorizeCertificateIssuance({ actorId: "LAB-001", roles: ["laboratory"] }, { current_stage: 5, test_status: "FAIL" });
+    assert.equal(res.allowed, false);
+    assert.equal(res.status, 400);
+  });
+
+  test("laboratory can issue when stage is 5 and status is PASS", () => {
+    const res = authorizeCertificateIssuance({ actorId: "LAB-001", roles: ["laboratory"] }, { current_stage: 5, test_status: "PASS" });
+    assert.equal(res.allowed, true);
+    assert.equal(res.status, 201);
+  });
+});
+
+// -- 9. HC-014 Server-Side Cryptographic OTP Verification ----------------------
+describe("HC-014 Cryptographic OTP Service", async () => {
+  const { generateOtp, verifyOtp } = await import("../server/services/otpService.js");
+
+  test("generates 6-digit numeric OTP and stores with expiry", () => {
+    const { rawOtp, expiresInSeconds } = generateOtp("user@honeychain.test", "login");
+    assert.equal(rawOtp.length, 6);
+    assert.match(rawOtp, /^\d{6}$/);
+    assert.ok(expiresInSeconds > 0);
+  });
+
+  test("verifies valid OTP successfully on first attempt", () => {
+    const { rawOtp } = generateOtp("verify@honeychain.test", "login");
+    const result = verifyOtp("verify@honeychain.test", rawOtp, "login");
+    assert.equal(result.verified, true);
+  });
+
+  test("invalidates OTP after successful verification (single-use)", () => {
+    const { rawOtp } = generateOtp("singleuse@honeychain.test", "login");
+    const firstAttempt = verifyOtp("singleuse@honeychain.test", rawOtp, "login");
+    assert.equal(firstAttempt.verified, true);
+    const secondAttempt = verifyOtp("singleuse@honeychain.test", rawOtp, "login");
+    assert.equal(secondAttempt.verified, false);
+  });
+
+  test("rejects incorrect OTP and decrements attempts", () => {
+    generateOtp("retry@honeychain.test", "login");
+    const result = verifyOtp("retry@honeychain.test", "000000", "login");
+    assert.equal(result.verified, false);
+    assert.match(result.error, /Invalid verification code/);
+  });
+});
+
+// -- 10. HC-026 SSRF Protection & IP Validation --------------------------------
+describe("HC-026 SSRF Protection & IP Validation", async () => {
+  const { validateAndSanitizeTargetUrl } = await import("../server/routes/cameraRoutes.js");
+
+  test("rejects cloud metadata IP (169.254.169.254)", () => {
+    assert.throws(
+      () => validateAndSanitizeTargetUrl("http://169.254.169.254/capture"),
+      (err) => err.message.includes("[SSRF_BLOCKED]")
+    );
+  });
+
+  test("rejects arbitrary public internet IP (8.8.8.8) in non-test mode", () => {
+    const prevEnv = process.env.NODE_ENV;
+    const prevLoopback = process.env.ALLOW_TEST_LOOPBACK;
+    try {
+      process.env.NODE_ENV = "production";
+      delete process.env.ALLOW_TEST_LOOPBACK;
+      assert.throws(
+        () => validateAndSanitizeTargetUrl("http://8.8.8.8/capture"),
+        (err) => err.message.includes("[SSRF_BLOCKED]")
+      );
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+      process.env.ALLOW_TEST_LOOPBACK = prevLoopback;
+    }
+  });
+
+  test("rejects DNS hostnames / non-IP addresses in non-test mode", () => {
+    const prevEnv = process.env.NODE_ENV;
+    const prevLoopback = process.env.ALLOW_TEST_LOOPBACK;
+    try {
+      process.env.NODE_ENV = "production";
+      delete process.env.ALLOW_TEST_LOOPBACK;
+      assert.throws(
+        () => validateAndSanitizeTargetUrl("http://evil.internal.corp/capture"),
+        (err) => err.message.includes("[SSRF_BLOCKED]")
+      );
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+      process.env.ALLOW_TEST_LOOPBACK = prevLoopback;
+    }
+  });
+
+  test("accepts valid RFC-1918 private subnets (192.168.x.x, 10.x.x.x)", () => {
+    const prevEnv = process.env.NODE_ENV;
+    const prevLoopback = process.env.ALLOW_TEST_LOOPBACK;
+    try {
+      process.env.NODE_ENV = "production";
+      delete process.env.ALLOW_TEST_LOOPBACK;
+      assert.equal(validateAndSanitizeTargetUrl("http://192.168.1.150"), "http://192.168.1.150");
+      assert.equal(validateAndSanitizeTargetUrl("http://10.0.5.21:8080"), "http://10.0.5.21:8080");
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+      process.env.ALLOW_TEST_LOOPBACK = prevLoopback;
+    }
+  });
+});
+

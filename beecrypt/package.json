@@ -10,7 +10,10 @@
     "migrate": "node server/db/migrate.js",
     "db:clean": "node server/db/clean.js",
     "build": "vite build",
+    "lint": "eslint src/ server/",
+    "typecheck": "tsc --noEmit",
     "test": "node --test tests/remediation.test.js tests/security.test.js tests/camera.test.js tests/sensor.test.js",
+    "test:ci": "node --test tests/remediation.test.js tests/security.test.js tests/camera.test.js tests/sensor.test.js",
     "preview": "vite preview",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
@@ -42,8 +45,10 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
+    "eslint": "^10.10.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
+    "typescript": "^7.0.2",
     "vite": "^5.3.1"
   }
 }

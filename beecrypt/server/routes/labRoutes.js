@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query, pool } from '../db/pool.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -106,7 +106,7 @@ router.get('/quality-results', requireAuth, async (req, res, next) => {
   }
 });
 
-router.post('/quality-results', requireAuth, async (req, res, next) => {
+router.post('/quality-results', requireAuth, requireRole('laboratory', 'verifier', 'kvic', 'admin'), async (req, res, next) => {
   const client = await pool.connect();
   try {
     const {
@@ -127,11 +127,26 @@ router.post('/quality-results', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'batchId is required' });
     }
 
+    await client.query('BEGIN');
+
+    // Verify batch exists and is in Stage 4 (Lab Requested)
+    const { rows: batchRows } = await client.query('SELECT stage FROM batches WHERE batch_id = $1', [batchId]);
+    if (!batchRows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: `Batch ${batchId} not found` });
+    }
+    const currentStage = Number(batchRows[0].stage);
+    const isPrivileged = req.user.roles?.some((r) => ['kvic', 'admin'].includes(r));
+    if (currentStage !== 4 && !isPrivileged) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: `Cannot record quality results: batch must be in Stage 4 (Lab Requested), currently in Stage ${currentStage}`,
+      });
+    }
+
     const effectiveId = testId || `TEST-${Date.now().toString().slice(-6)}`;
     const effectiveLab = labId || req.user.actorId;
     const effectiveStatus = testStatus || 'PASS';
-
-    await client.query('BEGIN');
 
     const { rows } = await client.query(
       `INSERT INTO quality_results (
@@ -215,26 +230,53 @@ router.get('/certificates', requireAuth, async (req, res, next) => {
   }
 });
 
-router.post('/certificates', requireAuth, async (req, res, next) => {
+router.post('/certificates', requireAuth, requireRole('laboratory', 'verifier', 'kvic', 'admin'), async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { certificateId, batchId, labId, testDate, issueDate, result, verifierId, fileName } = req.body;
+    const { certificateId, batchId, labId, testDate, issueDate, result, verifierId, fileName, uploaded } = req.body;
 
     if (!batchId) {
       return res.status(400).json({ error: 'batchId is required' });
+    }
+
+    await client.query('BEGIN');
+
+    // Verify batch exists, is Stage 5 (Quality Verified) and test_status is PASS
+    const { rows: batchRows } = await client.query('SELECT stage, test_status FROM batches WHERE batch_id = $1', [batchId]);
+    if (!batchRows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: `Batch ${batchId} not found` });
+    }
+
+    const currentStage = Number(batchRows[0].stage);
+    const testStatus = batchRows[0].test_status;
+    const isPrivileged = req.user.roles?.some((r) => ['kvic', 'admin'].includes(r));
+
+    if (currentStage !== 5 && !isPrivileged) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: `Cannot issue certificate: batch must be in Stage 5 (Quality Verified), currently in Stage ${currentStage}`,
+      });
+    }
+
+    if (testStatus !== 'PASS' && !isPrivileged) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: `Cannot issue certificate: batch test_status must be PASS, currently ${testStatus}`,
+      });
     }
 
     const effectiveId = certificateId || `AGMARK-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
     const effectiveLab = labId || req.user.actorId;
     const effectiveIssueDate = issueDate || new Date().toISOString().slice(0, 10);
     const effectiveResult = result || 'PASS';
-
-    await client.query('BEGIN');
+    // HC-024: Do not mark uploaded = true unless an actual file is verified/uploaded
+    const isUploaded = Boolean(fileName && uploaded === true);
 
     const { rows } = await client.query(
       `INSERT INTO certificates (
         certificate_id, batch_id, lab_id, test_date, issue_date, result, verifier_id, file_name, uploaded
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         effectiveId,
@@ -244,7 +286,8 @@ router.post('/certificates', requireAuth, async (req, res, next) => {
         effectiveIssueDate,
         effectiveResult,
         verifierId || req.user.actorId,
-        fileName || `${effectiveId}.pdf`,
+        fileName || null,
+        isUploaded,
       ]
     );
 
@@ -267,6 +310,7 @@ router.post('/certificates', requireAuth, async (req, res, next) => {
       verifierId: r.verifier_id,
       fileName: r.file_name,
       uploaded: r.uploaded,
+      documentStatus: r.uploaded ? 'CERTIFICATE_DOCUMENT_AVAILABLE' : 'CERTIFICATE_METADATA_ONLY',
     });
   } catch (err) {
     await client.query('ROLLBACK');

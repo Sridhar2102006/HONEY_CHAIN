@@ -15,7 +15,7 @@ export default function RetailerDashboard() {
 
   // Certified batches that are ready for or already on retail shelves (stage >= 5 or certified)
   const shelfBatches = batches.filter((b) => b.stage >= 5 || b.certStatus === "CERTIFIED");
-  const totalStockLitres = shelfBatches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
+  const totalStockKg = shelfBatches.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
   const pendingIntake = batches.filter((b) => b.stage === 3).length;
 
   return (
@@ -41,7 +41,7 @@ export default function RetailerDashboard() {
         {/* Store Summary Metrics */}
         <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/15 text-center">
           <div>
-            <div className="font-display font-bold text-xl text-[#FFD166]">{totalStockLitres.toFixed(1)} L</div>
+            <div className="font-display font-bold text-xl text-[#FFD166]">{totalStockKg.toFixed(1)} kg</div>
             <div className="text-[10.5px] text-white/70">Verified Shelf Stock</div>
           </div>
           <div>
@@ -94,7 +94,7 @@ export default function RetailerDashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           label="On-Shelf Honey"
-          value={`${totalStockLitres.toFixed(0)} L`}
+          value={`${totalStockKg.toFixed(0)} kg`}
           sub="AGMARK Certified"
           icon={Droplets}
         />

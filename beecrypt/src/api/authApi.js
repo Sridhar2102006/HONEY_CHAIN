@@ -25,6 +25,14 @@ export const authApi = {
   async register(registrationData) {
     return apiClient.post('/auth/register', registrationData);
   },
+
+  async requestOtp(email, purpose = 'VERIFY_EMAIL') {
+    return apiClient.post('/auth/request-otp', { email, purpose });
+  },
+
+  async verifyOtp(email, otp, purpose = 'VERIFY_EMAIL') {
+    return apiClient.post('/auth/verify-otp', { email, otp, purpose });
+  },
 };
 
 export default authApi;

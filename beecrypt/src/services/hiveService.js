@@ -59,47 +59,8 @@ export function listAlerts(hiveId) {
   return hiveId ? ALERTS.filter((a) => a.hiveId === hiveId) : ALERTS;
 }
 
+import { SimulationProvider } from "./aiHealthProvider.js";
+
 export function runAiHealthAnalysis(hiveId, imageFile) {
-  const fileName = imageFile?.name || (typeof imageFile === "string" ? imageFile : "honeycomb_frame.jpg");
-  const fileSize = imageFile?.size || 1024 * 450;
-  const seed = hashString(`${hiveId}-${fileName}-${fileSize}`);
-
-  // Deterministic simulation based on hive ID + file characteristics
-  const isHighRisk = (seed % 10) >= 7 || hiveId === "H-1030";
-  const isModerateRisk = !isHighRisk && ((seed % 10) >= 5 || hiveId === "H-1026");
-
-  const result = isHighRisk
-    ? {
-        status: "CRITICAL",
-        label: "Varroa Destructor Mite Infestation Detected",
-        confidence: +(88.5 + (seed % 80) / 10).toFixed(1),
-        recommendation: "Immediate oxalic acid vapor treatment recommended. Check brood nest within 24 hours.",
-      }
-    : isModerateRisk
-    ? {
-        status: "WARNING",
-        label: "Irregular Brood Comb Pattern / Spotty Brood",
-        confidence: +(84.2 + (seed % 70) / 10).toFixed(1),
-        recommendation: "Inspect queen laying vigor and evaluate frame for early chalkbrood symptoms.",
-      }
-    : {
-        status: "HEALTHY",
-        label: "Healthy Comb Architecture — No Disease Detected",
-        confidence: +(93.0 + (seed % 60) / 10).toFixed(1),
-        recommendation: "Colony density and brood capping appear normal. Continue standard 14-day inspection cycle.",
-      };
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        ...result,
-        hiveId,
-        fileName,
-        fileSize,
-        analyzedAt: new Date().toISOString(),
-        isSimulated: true,
-        disclaimer: "Simulated AI Model (Demonstration) — Not certified by veterinary laboratory.",
-      });
-    }, 1200);
-  });
+  return SimulationProvider.analyzeFrame(hiveId, imageFile);
 }

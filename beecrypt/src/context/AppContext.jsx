@@ -204,11 +204,7 @@ export function AppProvider({ children }) {
       } catch {}
     });
 
-    try {
-      await fetch("http://localhost:3001/api/v1/health/clean", { method: "POST" });
-    } catch {}
-
-    showToast("All data wiped! Ready for fresh manual data entry.", "success");
+    showToast("Client cache cleared. Ready for fresh entries.", "success");
   }, [showToast]);
 
   // ---- Fetch real backend state on mount or user change ----

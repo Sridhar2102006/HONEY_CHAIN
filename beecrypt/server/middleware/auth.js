@@ -44,6 +44,11 @@ export function requireAuth(req, res, next) {
     token = req.headers.authorization.split(' ')[1];
   }
 
+  // 3. Fallback to query parameter (e.g. EventSource SSE streams or <img> src)
+  if (!token && req.query?.token) {
+    token = req.query.token;
+  }
+
   if (!token) {
     return res.status(401).json({
       error: 'Authentication required',
@@ -85,3 +90,5 @@ export function generateToken(payload) {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 }
+
+export { JWT_SECRET };

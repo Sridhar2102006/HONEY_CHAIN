@@ -21,18 +21,18 @@ export default function ProcessorDashboard() {
   const processing = batches.filter((b) => b.stage === 2).length;
   const awaitingLab = batches.filter((b) => b.stage === 4).length;
   const certified = batches.filter((b) => b.certStatus === "CERTIFIED").length;
-  const totalLitres = batches.reduce((s, b) => s + Number(b.quantity), 0);
+  const totalKg = batches.reduce((s, b) => s + Number(b.quantity), 0);
 
   const productionSeries = useMemo(() => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentMonthIdx = new Date().getMonth();
-    const series = months.slice(0, Math.max(currentMonthIdx + 1, 6)).map((m) => ({ m, litres: 0 }));
+    const series = months.slice(0, Math.max(currentMonthIdx + 1, 6)).map((m) => ({ m, volumeKg: 0 }));
     batches.forEach((b) => {
       const d = b.harvestDate || b.extractedAt || b.createdAt ? new Date(b.harvestDate || b.extractedAt || b.createdAt) : null;
       if (d && !isNaN(d.getTime())) {
         const mName = months[d.getMonth()];
         const entry = series.find((s) => s.m === mName);
-        if (entry) entry.litres += Number(b.quantity || 0);
+        if (entry) entry.volumeKg += Number(b.quantity || 0);
       }
     });
     return series;
@@ -61,7 +61,7 @@ export default function ProcessorDashboard() {
         {/* Facility Summary Metrics */}
         <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/15 text-center">
           <div>
-            <div className="font-display font-bold text-xl text-bc-gold">{totalLitres.toFixed(1)} L</div>
+            <div className="font-display font-bold text-xl text-bc-gold">{totalKg.toFixed(1)} kg</div>
             <div className="text-[10.5px] text-white/70">Total Received</div>
           </div>
           <div>
@@ -146,7 +146,7 @@ export default function ProcessorDashboard() {
       </div>
 
       {/* Production Chart */}
-      <ChartCard title="Monthly Production Volume (Litres)">
+      <ChartCard title="Monthly Production Volume (kg)">
         <div className="py-1">
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={productionSeries}>
@@ -154,7 +154,7 @@ export default function ProcessorDashboard() {
               <XAxis dataKey="m" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip />
-              <Bar dataKey="litres" fill="#F59E0B" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="volumeKg" fill="#F59E0B" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

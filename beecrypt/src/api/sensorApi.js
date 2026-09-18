@@ -42,6 +42,8 @@ export const sensorApi = {
     const params = new URLSearchParams();
     if (hiveId) params.append('hiveId', hiveId);
     if (deviceId) params.append('deviceId', deviceId);
+    const token = localStorage.getItem('token');
+    if (token) params.append('token', token);
     const query = params.toString() ? `?${params.toString()}` : '';
 
     const streamUrl = `${getApiBaseUrl()}/sensors/stream${query}`;

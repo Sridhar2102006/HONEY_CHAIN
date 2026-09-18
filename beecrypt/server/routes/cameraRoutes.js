@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 import { GridFSBucket, MongoClient, ObjectId } from 'mongodb';
 import { requireAuth } from '../middleware/auth.js';
+import { query as pgQuery } from '../db/pool.js';
 
 const router = Router();
 const upload = multer({
@@ -11,9 +11,93 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
-const getEsp32Ip = () => (process.env.ESP32_IP || 'http://10.131.229.39').replace(/\/$/, '');
+// HC-026: Strict SSRF validation and IP sanitization for ESP32 target
+function isPrivateRfc1918Ip(ip) {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) {
+    return false;
+  }
+  if (parts[0] === 10) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  return false;
+}
+
+export function validateAndSanitizeTargetUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    throw new Error('Device target URL must be a non-empty string.');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl.startsWith('http') ? rawUrl : `http://${rawUrl}`);
+  } catch {
+    throw new Error(`Invalid URL format for camera target: ${rawUrl}`);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Forbidden protocol '${parsed.protocol}'. Only http/https permitted.`);
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Explicit SSRF Blacklist
+  const SSRF_BLOCKED = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '169.254.169.254',
+    'metadata.google.internal',
+    'instance-data',
+    '::1',
+  ];
+
+  const isTestEnv = process.env.NODE_ENV === 'test' || process.env.ALLOW_TEST_LOOPBACK === 'true';
+
+  if (!isTestEnv) {
+    if (SSRF_BLOCKED.includes(hostname) || hostname.startsWith('127.') || hostname.startsWith('169.254.')) {
+      throw new Error(`[SSRF_BLOCKED] Access to target host '${hostname}' is prohibited.`);
+    }
+
+    if (!isPrivateRfc1918Ip(hostname)) {
+      throw new Error(`[SSRF_BLOCKED] Camera target '${hostname}' must be an authorized RFC1918 private IoT LAN address.`);
+    }
+  } else {
+    // In test environment, loopback is permitted for local mock fixtures, but cloud metadata endpoints remain strictly forbidden
+    if (hostname === '169.254.169.254' || hostname.startsWith('169.254.') || hostname === 'metadata.google.internal' || hostname === 'instance-data') {
+      throw new Error(`[SSRF_BLOCKED] Access to target host '${hostname}' is prohibited.`);
+    }
+  }
+
+  return `${parsed.protocol}//${parsed.host}`;
+}
+
+const getEsp32Ip = () => {
+  const raw = process.env.ESP32_IP || 'http://10.131.229.39';
+  return validateAndSanitizeTargetUrl(raw);
+};
+
 const CAMERA_DEVICE_KEY = process.env.CAMERA_DEVICE_KEY || 'YOUR_GENERATED_KEY';
-const JWT_SECRET = process.env.JWT_SECRET || 'beecrypt_dev_only_secret_DO_NOT_USE_IN_PRODUCTION';
+
+// HC-025: Verify hive ownership for camera access
+async function verifyHiveOwnership(hiveId, user) {
+  if (!hiveId) return true;
+  if (!user) return false;
+  const roles = user.roles || [];
+  if (roles.some((r) => ['kvic', 'admin', 'verifier'].includes(r))) {
+    return true;
+  }
+  try {
+    const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
+    if (!rows[0]) {
+      return process.env.NODE_ENV !== 'production';
+    }
+    return rows[0].producer_id === user.actorId;
+  } catch (err) {
+    console.error('[CAMERA] Hive authorization lookup failed:', err.message);
+    return false;
+  }
+}
 
 // Concurrency lock to prevent duplicate capture triggers
 let isCaptureInProgress = false;
@@ -50,9 +134,9 @@ async function getMongoContext() {
         capturesCollection = cameraDb.collection('captures');
 
         // Ensure indexes for fast deterministic lookup
-        capturesCollection.createIndex({ captureId: 1 }, { unique: true }).catch(() => {});
-        capturesCollection.createIndex({ capturedAt: -1 }).catch(() => {});
-        capturesCollection.createIndex({ hiveId: 1 }).catch(() => {});
+        await capturesCollection.createIndex({ captureId: 1 }, { unique: true }).catch(() => {});
+        await capturesCollection.createIndex({ capturedAt: -1 }).catch(() => {});
+        await capturesCollection.createIndex({ hiveId: 1 }).catch(() => {});
 
         console.log(`[CAMERA] Connected to MongoDB Atlas (${dbName}) for GridFS and Captures.`);
         return { client: mongoClient, db: cameraDb, bucket: imageBucket, captures: capturesCollection };
@@ -73,35 +157,6 @@ function requireDeviceKey(req, res, next) {
     return res.status(401).json({ error: 'Invalid camera device key', code: 'UNAUTHORIZED_DEVICE' });
   }
   next();
-}
-
-// Authentication middleware accepting Cookie, Header, or Query Token for <img> tags
-function authenticateRequest(req, res, next) {
-  let token = req.cookies?.token;
-  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  if (!token && req.query?.token) {
-    token = req.query.token;
-  }
-
-  if (!token) {
-    return res.status(401).json({
-      error: 'Authentication required to access camera assets.',
-      code: 'UNAUTHORIZED',
-    });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch {
-    return res.status(401).json({
-      error: 'Invalid or expired authentication token.',
-      code: 'INVALID_TOKEN',
-    });
-  }
 }
 
 // Validate JPEG magic bytes (SOI: 0xFF 0xD8 0xFF)
@@ -147,8 +202,9 @@ async function fetchFromEsp32(pathname, timeoutMs = 12000) {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/status', requireAuth, async (req, res) => {
   const startTime = Date.now();
-  const esp32Base = getEsp32Ip();
+  let esp32Base = null;
   try {
+    esp32Base = getEsp32Ip();
     const response = await fetchFromEsp32('/status', 3000);
     const latencyMs = Date.now() - startTime;
     const isOnline = response.ok;
@@ -163,7 +219,7 @@ router.get('/status', requireAuth, async (req, res) => {
   } catch (err) {
     res.json({
       online: false,
-      address: esp32Base,
+      address: esp32Base || process.env.ESP32_IP || 'unconfigured',
       latencyMs: Date.now() - startTime,
       error: err.name === 'AbortError' ? 'Connection timed out (3000ms)' : err.message,
       timestamp: new Date().toISOString(),
@@ -171,6 +227,7 @@ router.get('/status', requireAuth, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. POST /capture — Trigger photo capture, store in MongoDB, return metadata
 // ─────────────────────────────────────────────────────────────────────────────
@@ -184,9 +241,20 @@ router.post('/capture', requireAuth, async (req, res) => {
     });
   }
 
+  const hiveId = req.body?.hiveId || 'H-DEFAULT';
+
+  // HC-025: Authorize hive ownership before triggering camera
+  const isAuthorized = await verifyHiveOwnership(hiveId, req.user);
+  if (!isAuthorized) {
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden: You do not have permission to trigger captures for this hive.',
+      code: 'FORBIDDEN_HIVE_ACCESS',
+    });
+  }
+
   isCaptureInProgress = true;
   const captureStartTime = Date.now();
-  const hiveId = req.body?.hiveId || 'H-DEFAULT';
   const captureId = generateCaptureId();
   const createdBy = req.user?.actorId || req.user?.id || 'anonymous';
 
@@ -329,9 +397,9 @@ router.post('/capture', requireAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. GET /captures/:captureId/image — Stream binary image from MongoDB GridFS
+// 3. GET /captures/:captureId/image — Stream binary image from MongoDB GridFS (HC-025)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/captures/:captureId/image', authenticateRequest, async (req, res) => {
+router.get('/captures/:captureId/image', requireAuth, async (req, res) => {
   const { captureId } = req.params;
 
   try {
@@ -339,7 +407,23 @@ router.get('/captures/:captureId/image', authenticateRequest, async (req, res) =
 
     // Look up capture document
     const record = await captures.findOne({ captureId });
-    let gridFsFileId = record?.gridFsFileId;
+    if (!record) {
+      return res.status(404).json({
+        error: `No image found for Capture ID: ${captureId}`,
+        code: 'IMAGE_NOT_FOUND',
+      });
+    }
+
+    // HC-025: Authorize hive ownership
+    const isAuthorized = await verifyHiveOwnership(record.hiveId, req.user);
+    if (!isAuthorized) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to access images for this hive.',
+        code: 'FORBIDDEN_HIVE_ACCESS',
+      });
+    }
+
+    let gridFsFileId = record.gridFsFileId;
 
     if (!gridFsFileId) {
       // Fallback lookup in images.files by filename
@@ -351,7 +435,7 @@ router.get('/captures/:captureId/image', authenticateRequest, async (req, res) =
 
     if (!gridFsFileId) {
       return res.status(404).json({
-        error: `No image found for Capture ID: ${captureId}`,
+        error: `No image binary found for Capture ID: ${captureId}`,
         code: 'IMAGE_NOT_FOUND',
       });
     }
@@ -377,7 +461,7 @@ router.get('/captures/:captureId/image', authenticateRequest, async (req, res) =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. GET /captures/:captureId — Retrieve capture metadata
+// 4. GET /captures/:captureId — Retrieve capture metadata (HC-025)
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/captures/:captureId', requireAuth, async (req, res) => {
   const { captureId } = req.params;
@@ -388,6 +472,15 @@ router.get('/captures/:captureId', requireAuth, async (req, res) => {
 
     if (!record) {
       return res.status(404).json({ error: `Capture not found: ${captureId}`, code: 'CAPTURE_NOT_FOUND' });
+    }
+
+    // HC-025: Authorize hive ownership
+    const isAuthorized = await verifyHiveOwnership(record.hiveId, req.user);
+    if (!isAuthorized) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to view metadata for this hive.',
+        code: 'FORBIDDEN_HIVE_ACCESS',
+      });
     }
 
     res.json({
@@ -410,13 +503,37 @@ router.get('/captures/:captureId', requireAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. GET /captures — Retrieve recent captures list
+// 5. GET /captures — Retrieve recent captures list with tenant isolation (HC-025)
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/captures', requireAuth, async (req, res) => {
   try {
     const { captures } = await getMongoContext();
     const limit = Math.min(parseInt(req.query?.limit, 10) || 10, 50);
-    const filter = req.query?.hiveId ? { hiveId: req.query.hiveId } : {};
+    const isPrivileged = (req.user?.roles || []).some((r) => ['kvic', 'admin', 'verifier'].includes(r));
+
+    const filter = {};
+    if (req.query?.hiveId) {
+      const isAuthorized = await verifyHiveOwnership(req.query.hiveId, req.user);
+      if (!isAuthorized) {
+        return res.status(403).json({
+          error: 'Forbidden: You do not have permission to view captures for this hive.',
+          code: 'FORBIDDEN_HIVE_ACCESS',
+        });
+      }
+      filter.hiveId = req.query.hiveId;
+    } else if (!isPrivileged) {
+      // Limit to caller's owned hives
+      const { rows } = await pgQuery('SELECT hive_id FROM hives WHERE producer_id = $1', [req.user.actorId]);
+      const ownedHiveIds = rows.map((r) => r.hive_id);
+      if (ownedHiveIds.length > 0) {
+        filter.hiveId = { $in: ownedHiveIds };
+      } else if (process.env.NODE_ENV !== 'production') {
+        // In dev, if no hives created yet, allow viewing default
+        filter.hiveId = { $in: ['H-1024', 'H-DEFAULT'] };
+      } else {
+        return res.json({ success: true, count: 0, captures: [] });
+      }
+    }
 
     const list = await captures.find(filter).sort({ capturedAt: -1 }).limit(limit).toArray();
 
@@ -441,28 +558,32 @@ router.get('/captures', requireAuth, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. GET /latest-image — Backward compatibility: stream most recent capture
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/latest-image', authenticateRequest, async (req, res) => {
+router.get('/latest-image', requireAuth, async (req, res) => {
   try {
-    const { bucket, db } = await getMongoContext();
-    const files = await db
-      .collection('images.files')
-      .find({})
-      .sort({ uploadDate: -1 })
-      .limit(1)
-      .toArray();
+    const { bucket, db, captures } = await getMongoContext();
+    const isPrivileged = (req.user?.roles || []).some((r) => ['kvic', 'admin', 'verifier'].includes(r));
 
-    if (!files.length) {
+    let filter = {};
+    if (!isPrivileged) {
+      const { rows } = await pgQuery('SELECT hive_id FROM hives WHERE producer_id = $1', [req.user.actorId]);
+      const ownedHiveIds = rows.map((r) => r.hive_id);
+      if (ownedHiveIds.length > 0) {
+        filter = { hiveId: { $in: ownedHiveIds } };
+      }
+    }
+
+    const latestCapture = await captures.findOne(filter, { sort: { capturedAt: -1 } });
+    if (!latestCapture) {
       return res.status(404).json({ error: 'No camera images found', code: 'NO_IMAGES' });
     }
 
-    const file = files[0];
     res.set({
-      'Content-Type': file.contentType || 'image/jpeg',
-      'Content-Disposition': `inline; filename="${file.filename || 'latest.jpg'}"`,
+      'Content-Type': latestCapture.mimeType || 'image/jpeg',
+      'Content-Disposition': `inline; filename="${latestCapture.filename || 'latest.jpg'}"`,
       'Cache-Control': 'no-cache',
     });
 
-    bucket.openDownloadStream(file._id).pipe(res);
+    bucket.openDownloadStream(latestCapture.gridFsFileId).pipe(res);
   } catch (err) {
     res.status(503).json({ error: 'Camera image store unavailable', detail: err.message });
   }

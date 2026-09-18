@@ -680,6 +680,15 @@ export default function AIHiveHealth() {
           {/* State 3: Done */}
           {state === "done" && result && (
             <div className="space-y-3 animate-in zoom-in-95 duration-200 pt-1">
+              {/* HC-009: Prototype Simulation Disclosure Badge */}
+              <div className="bg-amber-100 border border-amber-300 rounded-xl px-3 py-1.5 flex items-center justify-between text-xs font-bold text-amber-900">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  <span>PROTOTYPE SIMULATION</span>
+                </span>
+                <span className="text-[10px] font-mono font-medium text-amber-800">Rule-Based Simulation Model</span>
+              </div>
+
               <div
                 className={`rounded-2xl p-4 border ${
                   result.status === "HEALTHY"
@@ -707,7 +716,7 @@ export default function AIHiveHealth() {
 
                 <div className="text-xs mt-3 space-y-1.5 pt-2 border-t border-black/10 text-bc-dark">
                   <div className="flex justify-between">
-                    <span className="text-[#8A9086]">Diagnostic Confidence:</span>
+                    <span className="text-[#8A9086]">Simulation Confidence (Illustrative):</span>
                     <span className="font-bold">{result.confidence}%</span>
                   </div>
                   <div className="flex justify-between">
@@ -725,8 +734,14 @@ export default function AIHiveHealth() {
                 </div>
               </div>
 
+              {result.disclaimer && (
+                <div className="p-2.5 rounded-xl bg-[#FAF8F0] border border-[#ECE6D6] text-[10.5px] text-[#8A9086] italic leading-tight">
+                  ⚠️ {result.disclaimer}
+                </div>
+              )}
+
               <div className="flex items-center justify-between text-[11px] text-[#8A9086] px-1">
-                <span>Classified: {result.isSimulated ? "Simulated Model Output" : "On-Device Inference"}</span>
+                <span>Classified: {result.isSimulated ? "Prototype Simulation" : "On-Device Inference"}</span>
                 <span>{new Date(result.analyzedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
 

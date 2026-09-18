@@ -103,7 +103,7 @@ export default function HoneyExtraction() {
             {savedBatch.batchId}
           </div>
           <div className="text-xs font-semibold text-bc-dark mt-1">
-            {savedBatch.quantity} Litres · {savedBatch.honeyType} Honey
+            {savedBatch.quantity} kg · {savedBatch.honeyType} Honey
           </div>
         </div>
 
@@ -284,7 +284,7 @@ export default function HoneyExtraction() {
             {/* Numeric Stepper Touch Target */}
             <div>
               <label className="text-xs font-bold text-bc-dark block mb-1">
-                Quantity Extracted (Litres)
+                Quantity Extracted (kg)
               </label>
               <div className="flex items-center gap-3 mt-2">
                 <button
@@ -302,7 +302,7 @@ export default function HoneyExtraction() {
                     onChange={(e) => set("quantity", e.target.value)}
                     className="w-full text-center font-display font-bold text-3xl text-bc-deep-green bg-transparent outline-none"
                   />
-                  <span className="text-xs text-[#8A9086] uppercase font-bold">Litres</span>
+                  <span className="text-xs text-[#8A9086] uppercase font-bold">kg</span>
                 </div>
                 <button
                   type="button"
@@ -356,9 +356,9 @@ export default function HoneyExtraction() {
                 <span className="font-bold">{values.floralSource}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-[#8A9086]">Harvest Volume:</span>
+                <span className="text-[#8A9086]">Harvest Quantity:</span>
                 <span className="font-display font-bold text-base text-bc-amber">
-                  {values.quantity} Litres
+                  {values.quantity} kg
                 </span>
               </div>
             </div>

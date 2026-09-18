@@ -185,7 +185,7 @@ export default function KvicDashboard() {
       </div>
 
       {/* Honey Production Bar Chart */}
-      <ChartCard title="Ecosystem Production Volume (Litres)">
+      <ChartCard title="Ecosystem Production Volume (kg)">
         <div className="py-1">
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={productionSeries}>

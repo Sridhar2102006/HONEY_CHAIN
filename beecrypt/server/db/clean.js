@@ -32,6 +32,11 @@ const TABLES_TO_CLEAN = [
 ];
 
 async function runClean() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[SECURITY ERROR] Database clean operation is strictly prohibited in production mode.');
+    process.exit(1);
+  }
+
   const connStr = process.env.DATABASE_URL;
   if (!connStr) {
     console.error('No DATABASE_URL configured in server/.env');

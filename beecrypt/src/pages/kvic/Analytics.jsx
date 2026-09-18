@@ -68,7 +68,7 @@ export default function Analytics() {
         />
       </div>
 
-      <ChartCard title="Honey Harvest Growth (Litres)">
+      <ChartCard title="Honey Harvest Growth (kg)">
         <div className="py-1">
           <ResponsiveContainer width="100%" height={190}>
             <LineChart data={productionSeries}>

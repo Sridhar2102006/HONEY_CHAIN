@@ -84,7 +84,17 @@ router.post('/', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'hiveId is required' });
     }
 
-    const assignedProducer = producerId || req.user.multiActorIds?.beekeeper || req.user.actorId;
+    // IDOR Protection: Non-admin users cannot register hives for another beekeeper
+    const isPrivileged = req.user.roles?.some((r) => ['kvic', 'admin'].includes(r));
+    let assignedProducer = req.user.multiActorIds?.beekeeper || req.user.actorId;
+    if (producerId && producerId !== assignedProducer && !isPrivileged) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to register hives for another producer',
+      });
+    }
+    if (producerId && isPrivileged) {
+      assignedProducer = producerId;
+    }
 
     const { rows } = await query(
       `INSERT INTO hives (hive_id, producer_id, region, block, status, temp, humidity, vibration, sensor, battery)

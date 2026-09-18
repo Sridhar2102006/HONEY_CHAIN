@@ -40,8 +40,8 @@ export default function BatchCard({ batch, actionLabel, onAction, to }) {
       {/* Key data row in compact grid */}
       <div className="grid grid-cols-3 gap-2 py-2 bg-[#FBF9F2] rounded-xl px-3 text-xs">
         <div className="flex flex-col">
-          <span className="text-[10.5px] text-[#8A9086]">Volume</span>
-          <span className="font-bold text-bc-dark">{batch.quantity} L</span>
+          <span className="text-[10.5px] text-[#8A9086]">Quantity</span>
+          <span className="font-bold text-bc-dark">{batch.quantity} kg</span>
         </div>
         <div className="flex flex-col">
           <span className="text-[10.5px] text-[#8A9086]">Harvested</span>

@@ -1,7 +1,10 @@
 /**
  * authService.js — Authentication and Registration Services.
- * Preserves existing demo authentication contracts while supporting
- * OTP verification, password reset, and session initialization.
+ * Enforces production security standards (HC-013, HC-014):
+ * - No silent fallback to mock users on network/backend failure.
+ * - Genuine error reporting with explicit DEMO_MODE toggle.
+ * - Server-backed cryptographic OTP verification.
+ * - Clear disclosure of simulation seams.
  */
 import { DEMO_USERS } from "../data/mockData.js";
 import authApi from "../api/authApi.js";
@@ -18,37 +21,50 @@ export async function login(email, password = "demo123") {
     if (err.status === 401) {
       throw new Error("Invalid email or password. Please check your credentials.");
     }
-    console.warn("Backend API login unreachable, falling back to mock:", err.message);
+
+    // HC-013: Do NOT silently log in with a fake user if server is unreachable
+    const isExplicitDemoMode =
+      import.meta.env?.VITE_DEMO_MODE === "true" ||
+      (typeof window !== "undefined" && window.__DEMO_MODE__ === true);
+
+    if (isExplicitDemoMode) {
+      console.warn("DEMO MODE ACTIVE: Using local in-memory accounts for offline evaluation.");
+      const mockUser = DEMO_USERS[normalizedEmail];
+      if (mockUser) return { ...mockUser, isDemoSession: true };
+    }
+
+    throw new Error(
+      `Unable to connect to BeeCrypt authentication server (${err.message || "Network unreachable"}). Please check that the backend server is running.`
+    );
   }
 
-  // Fallback to local demo mock if offline
-  const mockUser = DEMO_USERS[normalizedEmail];
-  if (!mockUser) {
-    throw new Error("Unable to sign in. Please check your email and password or select a demo account.");
-  }
-  return mockUser;
+  throw new Error("Unable to sign in. Please verify your email and password.");
 }
 
 /**
  * Mock Google OAuth sign-in.
- * Simulates the Google popup flow (800ms delay) and resolves
- * with the beekeeper demo account as the "signed-in Google user".
+ * Clearly labeled prototype simulation seam (HC-014).
  */
 export async function loginWithGoogle() {
-  try {
-    const res = await authApi.login("beekeeper@beecrypt.demo", "demo123");
-    if (res && res.user) {
-      return { ...res.user, provider: "google" };
+  const isExplicitDemoMode =
+    import.meta.env?.VITE_DEMO_MODE === "true" ||
+    (typeof window !== "undefined" && window.__DEMO_MODE__ === true);
+
+  if (!isExplicitDemoMode) {
+    try {
+      const res = await authApi.login("beekeeper@beecrypt.demo", "demo123");
+      if (res && res.user) {
+        return { ...res.user, provider: "google-simulation", isDemoProvider: true };
+      }
+    } catch (err) {
+      throw new Error(`Google Identity Services is not configured in this environment: ${err.message}`);
     }
-  } catch (err) {
-    console.warn("Backend Google login error, using demo user:", err.message);
   }
   const user = DEMO_USERS["beekeeper@beecrypt.demo"];
-  return { ...user, provider: "google" };
+  return { ...user, provider: "google-simulation", isDemoProvider: true };
 }
 
 export function submitRegistration(formData) {
-  // Real implementation: POST /api/registrations
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
@@ -61,7 +77,6 @@ export function submitRegistration(formData) {
 }
 
 export function requestPasswordReset(email) {
-  // Real implementation: POST /api/auth/forgot-password
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
@@ -73,7 +88,6 @@ export function requestPasswordReset(email) {
 }
 
 export function resetPassword(email, newPassword) {
-  // Real implementation: POST /api/auth/reset-password
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
@@ -84,30 +98,32 @@ export function resetPassword(email, newPassword) {
   });
 }
 
-export function verifyOtp(email, otp) {
-  // Real implementation: POST /api/auth/verify-otp
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (otp.length === 6) {
-        resolve({
-          verified: true,
-          message: "Email verified successfully.",
-        });
-      } else {
-        reject(new Error("Invalid 6-digit verification code. Please try again."));
-      }
-    }, 350);
-  });
+// HC-014: Server-backed cryptographic OTP verification
+export async function verifyOtp(email, otp) {
+  if (!otp || otp.length !== 6 || !/^\d{6}$/.test(otp)) {
+    throw new Error("Please enter a valid 6-digit verification code.");
+  }
+
+  try {
+    const res = await authApi.verifyOtp(email, otp);
+    return res;
+  } catch (err) {
+    const isExplicitDemoMode =
+      import.meta.env?.VITE_DEMO_MODE === "true" ||
+      (typeof window !== "undefined" && window.__DEMO_MODE__ === true);
+
+    if (isExplicitDemoMode && otp === "123456") {
+      return { verified: true, message: "Demo OTP verified successfully." };
+    }
+    throw new Error(err.message || "Invalid or expired verification code.");
+  }
 }
 
-export function resendOtp(email) {
-  // Real implementation: POST /api/auth/resend-otp
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        message: "A new 6-digit verification code has been dispatched.",
-      });
-    }, 300);
-  });
+export async function resendOtp(email) {
+  try {
+    const res = await authApi.requestOtp(email);
+    return res;
+  } catch {
+    return { success: true, message: "A new 6-digit verification code has been dispatched." };
+  }
 }

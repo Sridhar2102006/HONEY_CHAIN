@@ -45,18 +45,26 @@ async function runMigrations() {
       const filePath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(filePath, 'utf8');
 
-      await client.query('BEGIN');
+      // Strip SQL comments and split into distinct statements for Neon HTTP compatibility
+      const cleanSql = sql.replace(/--.*$/gm, '');
+      const statements = cleanSql
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
       try {
-        await client.query(sql);
+        for (const statement of statements) {
+          if (statement) {
+            await client.query(statement);
+          }
+        }
         await client.query(
-          'INSERT INTO schema_migrations (name) VALUES ($1)',
+          'INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
           [file]
         );
-        await client.query('COMMIT');
-        console.log(`  ✅ ${file} applied successfully.`);
+        console.log(`  ✔ ${file} applied successfully.`);
         count++;
       } catch (err) {
-        await client.query('ROLLBACK');
         console.error(`  ❌ Failed to apply ${file}:`, err.message);
         throw err;
       }

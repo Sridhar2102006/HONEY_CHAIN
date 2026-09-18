@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { query } from '../db/pool.js';
 import { generateToken, requireAuth } from '../middleware/auth.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
+import { generateOtp, verifyOtp } from '../services/otpService.js';
 
 const router = Router();
 
@@ -194,6 +195,44 @@ router.post('/setup-password', async (req, res, next) => {
       message: 'Password set successfully. You are now signed in.',
       token,
       user: payload,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/auth/request-otp (HC-014: Cryptographic server-backed OTP dispatch)
+router.post('/request-otp', async (req, res, next) => {
+  try {
+    const { email, purpose } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    const { expiresInSeconds } = generateOtp(email, purpose || 'VERIFY_EMAIL');
+    res.json({
+      success: true,
+      message: 'A 6-digit verification code has been dispatched.',
+      expiresInSeconds,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/auth/verify-otp (HC-014: Server-side OTP validation)
+router.post('/verify-otp', async (req, res, next) => {
+  try {
+    const { email, otp, purpose } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and 6-digit verification code are required' });
+    }
+    const result = verifyOtp(email, otp, purpose || 'VERIFY_EMAIL');
+    if (!result.verified) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+    res.json({
+      success: true,
+      message: result.message,
     });
   } catch (err) {
     next(err);

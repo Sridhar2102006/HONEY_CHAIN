@@ -51,22 +51,45 @@ export function getApiBaseUrl() {
     if (IS_STAGING) {
       return 'https://staging-api.honeychain.app/api/v1';
     }
-    // Development local LAN fallback
-    return 'http://10.131.229.86:3001/api/v1';
+    // Development mobile fallback (Android emulator host or configured LAN URL)
+    return import.meta.env?.VITE_DEV_LAN_API_BASE_URL || 'http://10.0.2.2:3001/api/v1';
   }
 
   // Web Browser platform
   return webBase.replace(/\/+$/, '');
 }
 
+/**
+ * Resolves the public consumer verification URL for QR codes.
+ * Ensures HTTPS in production and rejects dead hardcoded demo domains. (HC-010)
+ */
+export function getPublicVerifyUrl(batchId) {
+  const customBase = import.meta.env?.VITE_PUBLIC_VERIFY_URL;
+  let baseUrl;
+  if (customBase && customBase.trim()) {
+    baseUrl = customBase.trim().replace(/\/+$/, '');
+  } else if (typeof window !== 'undefined' && window.location?.origin) {
+    baseUrl = window.location.origin;
+  } else {
+    baseUrl = IS_PROD ? 'https://verify.honeychain.app' : 'http://localhost:5173';
+  }
+
+  if (IS_PROD && baseUrl.startsWith('http://')) {
+    baseUrl = baseUrl.replace(/^http:\/\//, 'https://');
+  }
+
+  return `${baseUrl}/verify/${encodeURIComponent(batchId)}`;
+}
+
 export const env = {
   appEnv: APP_ENV,
   appName: import.meta.env?.VITE_APP_NAME || 'HoneyChain',
   appIdentifier: import.meta.env?.VITE_APP_IDENTIFIER || 'com.honeychain.app',
-  blockchainNetwork: import.meta.env?.VITE_BLOCKCHAIN_NETWORK || 'local-simulated',
+  blockchainNetwork: import.meta.env?.VITE_BLOCKCHAIN_NETWORK || 'local-hash-chain',
   isNative: isNativeMobile(),
   platform: getPlatform(),
   apiBaseUrl: getApiBaseUrl(),
+  getPublicVerifyUrl,
 };
 
 export default env;

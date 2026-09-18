@@ -103,7 +103,7 @@ export default function Traceability() {
                   {batch.batchId}
                 </h3>
                 <div className="text-xs text-[#6B7267] mt-0.5 font-semibold">
-                  {batch.honeyType} Honey · {batch.quantity} Litres
+                  {batch.honeyType} Honey · {batch.quantity} kg
                 </div>
               </div>
 

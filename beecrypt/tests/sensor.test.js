@@ -1,23 +1,34 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from '../server/node_modules/express/index.js';
+import cookieParser from '../server/node_modules/cookie-parser/index.js';
 import sensorRoutes, { closeSensorResources } from '../server/routes/sensorRoutes.js';
 import { MongoClient } from '../server/node_modules/mongodb/lib/index.js';
+import { generateToken } from '../server/middleware/auth.js';
 
-describe('ESP32 DevKit Telemetry → Backend → MongoDB → Real-Time SSE Integration Tests', () => {
+describe('ESP32 DevKit Telemetry ➔ Backend ➔ MongoDB ➔ Real-Time SSE Integration Tests', () => {
   let testApp;
   let testServer;
   let baseUrl;
   let mongoClient;
   let readingsCollection;
+  let authToken;
   const SENSOR_KEY = 'beecrypt_sensor_secret_key_2026';
   const TEST_DEVICE_ID = 'ESP32-TEST-DEVKIT-01';
   const TEST_HIVE_ID = 'H-TEST-99';
 
   before(async () => {
+    process.env.NODE_ENV = 'test';
     process.env.SENSOR_DEVICE_KEY = SENSOR_KEY;
     process.env.MONGODB_URI = 'mongodb+srv://esp32_user:honeychain2026@esp32cluster.w7u0bdo.mongodb.net/?appName=ESP32Cluster';
     process.env.MONGODB_DB = 'ESP32CAM';
+
+    authToken = generateToken({
+      id: 'usr_bk_01',
+      actorId: 'BK-001',
+      roles: ['beekeeper'],
+      email: 'beekeeper@beecrypt.demo',
+    });
 
     // Connect to MongoDB Atlas to verify schema and clean test docs
     mongoClient = new MongoClient(process.env.MONGODB_URI, {
@@ -31,6 +42,7 @@ describe('ESP32 DevKit Telemetry → Backend → MongoDB → Real-Time SSE Integ
     // Spin up test server mounting sensorRoutes
     testApp = express();
     testApp.use(express.json());
+    testApp.use(cookieParser());
     testApp.use('/api/v1/sensors', sensorRoutes);
 
     await new Promise((resolve) => {
@@ -224,8 +236,21 @@ describe('ESP32 DevKit Telemetry → Backend → MongoDB → Real-Time SSE Integ
     assert.equal(body.reading.status, 'alert');
   });
 
-  test('6. GET /latest retrieves the newest sensor reading from MongoDB', async () => {
-    const res = await fetch(`${baseUrl}/latest?deviceId=${TEST_DEVICE_ID}`);
+  test('5b. Telemetry read endpoints reject unauthenticated requests with 401 (HC-007)', async () => {
+    const resLatest = await fetch(`${baseUrl}/latest?deviceId=${TEST_DEVICE_ID}`);
+    assert.equal(resLatest.status, 401);
+
+    const resHistory = await fetch(`${baseUrl}/history?deviceId=${TEST_DEVICE_ID}`);
+    assert.equal(resHistory.status, 401);
+
+    const resStream = await fetch(`${baseUrl}/stream?hiveId=${TEST_HIVE_ID}`);
+    assert.equal(resStream.status, 401);
+  });
+
+  test('6. GET /latest retrieves the newest sensor reading from MongoDB (authenticated)', async () => {
+    const res = await fetch(`${baseUrl}/latest?deviceId=${TEST_DEVICE_ID}`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -235,8 +260,10 @@ describe('ESP32 DevKit Telemetry → Backend → MongoDB → Real-Time SSE Integ
     assert.equal(body.reading.vibration, true);
   });
 
-  test('7. GET /history retrieves chronological readings for charts', async () => {
-    const res = await fetch(`${baseUrl}/history?deviceId=${TEST_DEVICE_ID}&limit=10`);
+  test('7. GET /history retrieves chronological readings for charts (authenticated)', async () => {
+    const res = await fetch(`${baseUrl}/history?deviceId=${TEST_DEVICE_ID}&limit=10`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.success, true);
@@ -247,11 +274,14 @@ describe('ESP32 DevKit Telemetry → Backend → MongoDB → Real-Time SSE Integ
     assert.equal(body.readings[1].temperature, 31.0);
   });
 
-  test('8. Real-time SSE channel broadcasts live telemetry upon ingestion', async () => {
-    // Connect to SSE stream
+  test('8. Real-time SSE channel broadcasts live telemetry upon ingestion (authenticated)', async () => {
+    // Connect to SSE stream with Authorization header
     const controller = new AbortController();
     const sseResponse = await fetch(`${baseUrl}/stream?hiveId=${TEST_HIVE_ID}`, {
-      headers: { Accept: 'text/event-stream' },
+      headers: {
+        Accept: 'text/event-stream',
+        Authorization: `Bearer ${authToken}`,
+      },
       signal: controller.signal,
     });
 

@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { query, pool } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
+import {
+  validateBatchCreation,
+  validateBatchTransition,
+  validateBatchSplit,
+  StateMachineError,
+} from '../services/batchStateMachine.js';
 
 const router = Router();
 
@@ -85,11 +91,38 @@ router.post('/', requireAuth, async (req, res, next) => {
       harvestDate,
       quantity,
       processorId,
-      stage,
     } = req.body;
 
+    // 1. Validate batch creation via state machine
+    try {
+      validateBatchCreation(req.body, req.user);
+    } catch (valErr) {
+      return res.status(valErr.statusCode || 400).json({ error: valErr.message });
+    }
+
+    // 2. IDOR Protection: Caller cannot assign arbitrary producer unless admin/KVIC
+    const isPrivileged = req.user.roles?.some((r) => ['kvic', 'admin'].includes(r));
+    let effectiveProducerId = req.user.multiActorIds?.beekeeper || req.user.actorId;
+    if (producerId && producerId !== effectiveProducerId && !isPrivileged) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to harvest or register batches for another producer',
+      });
+    }
+    if (producerId && isPrivileged) {
+      effectiveProducerId = producerId;
+    }
+
+    // 3. Hive ownership validation
+    if (hiveId) {
+      const { rows: hiveRows } = await query('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
+      if (hiveRows.length > 0 && hiveRows[0].producer_id !== effectiveProducerId && !isPrivileged) {
+        return res.status(403).json({
+          error: `Forbidden: Hive ${hiveId} belongs to producer ${hiveRows[0].producer_id}, not your account (${effectiveProducerId})`,
+        });
+      }
+    }
+
     const generatedId = batchId || `BEE-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
-    const effectiveProducerId = producerId || req.user.multiActorIds?.beekeeper || req.user.actorId;
     const effectiveProducerName = producerName || req.user.name;
 
     const { rows } = await query(
@@ -97,7 +130,7 @@ router.post('/', requireAuth, async (req, res, next) => {
         batch_id, producer_id, producer_name, hive_id, region,
         honey_type, floral_source, harvest_date, quantity,
         processor_id, stage, processing_status, test_status, cert_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Pending', 'PENDING', 'PENDING')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 'Pending', 'PENDING', 'PENDING')
       RETURNING *`,
       [
         generatedId,
@@ -108,9 +141,8 @@ router.post('/', requireAuth, async (req, res, next) => {
         honeyType || 'Multifloral',
         floralSource || 'Wildflower',
         harvestDate || new Date().toISOString().slice(0, 10),
-        quantity || 10.0,
+        parseFloat(quantity),
         processorId || 'PR-001',
-        stage || 1,
       ]
     );
 
@@ -139,9 +171,9 @@ router.patch('/:batchId', requireAuth, async (req, res, next) => {
       quantity,
     } = req.body;
 
-    // ── Authorization: fetch batch first to validate ownership ──────────────
+    // ── Authorization & State Machine: fetch complete batch first ───────────
     const { rows: existing } = await query(
-      'SELECT producer_id, processor_id FROM batches WHERE batch_id = $1',
+      'SELECT * FROM batches WHERE batch_id = $1',
       [batchId]
     );
     if (!existing[0]) {
@@ -157,6 +189,13 @@ router.patch('/:batchId', requireAuth, async (req, res, next) => {
     if (!isPrivileged && !isProducer && !isAssignedProcessor) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to update this batch' });
     }
+
+    // ── State Machine Transition & Invariant Validation ──────────────────────
+    try {
+      validateBatchTransition(existing[0], req.body, req.user);
+    } catch (smErr) {
+      return res.status(smErr.statusCode || 400).json({ error: smErr.message });
+    }
     // ────────────────────────────────────────────────────────────────────────
 
     const updates = ['updated_at = NOW()'];
@@ -171,12 +210,11 @@ router.patch('/:batchId', requireAuth, async (req, res, next) => {
     if (testStatus !== undefined) { updates.push(`test_status = $${idx++}`); params.push(testStatus); }
     if (certificateId !== undefined) { updates.push(`certificate_id = $${idx++}`); params.push(certificateId); }
     if (certStatus !== undefined) { updates.push(`cert_status = $${idx++}`); params.push(certStatus); }
-    if (quantity !== undefined) { updates.push(`quantity = $${idx++}`); params.push(quantity); }
+    if (quantity !== undefined) { updates.push(`quantity = $${idx++}`); params.push(parseFloat(quantity)); }
 
     const sql = `UPDATE batches SET ${updates.join(', ')} WHERE batch_id = $1 RETURNING *`;
     const { rows } = await query(sql, params);
 
-    // Batch was just confirmed to exist above; this is a safety net only.
     if (!rows[0]) {
       return res.status(404).json({ error: `Batch ${batchId} not found` });
     }
@@ -206,6 +244,14 @@ router.post('/:batchId/split', requireAuth, async (req, res, next) => {
     if (!parent) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: `Parent batch ${batchId} not found` });
+    }
+
+    // Validate state and mass conservation
+    try {
+      validateBatchSplit(parent, splits);
+    } catch (splitErr) {
+      await client.query('ROLLBACK');
+      return res.status(splitErr.statusCode || 400).json({ error: splitErr.message });
     }
 
     const createdChildren = [];

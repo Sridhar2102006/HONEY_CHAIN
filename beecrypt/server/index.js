@@ -10,8 +10,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
-// Reuse the existing local ESP32-CAM MongoDB configuration during migration.
-dotenv.config({ path: path.resolve(__dirname, '../../../ESP32CAM_MongoDB/.env') });
 dotenv.config();
 
 import { pool } from './db/pool.js';
@@ -42,7 +40,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// 2. Health check & clean endpoints
+// 2. Safe Health Check endpoint
 app.get('/api/v1/health', async (req, res) => {
   try {
     const dbCheck = await pool.query('SELECT 1 AS status');
@@ -60,32 +58,6 @@ app.get('/api/v1/health', async (req, res) => {
       error: err.message,
       timestamp: new Date().toISOString(),
     });
-  }
-});
-
-app.post('/api/v1/health/clean', async (req, res) => {
-  try {
-    const tables = [
-      'alerts',
-      'notifications',
-      'certificates',
-      'quality_results',
-      'test_requests',
-      'inspections',
-      'provenance_events',
-      'batch_relationships',
-      'batches',
-      'hives',
-      'pending_applications',
-    ];
-    await pool.query(`TRUNCATE TABLE ${tables.join(', ')} CASCADE;`);
-    res.json({
-      status: 'ok',
-      message: 'All operational data truncated successfully. Ready for fresh manual entries.',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
   }
 });
 

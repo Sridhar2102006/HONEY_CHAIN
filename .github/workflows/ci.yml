@@ -29,9 +29,14 @@ jobs:
           npm ci
           npm --prefix server ci
 
-      - name: Run Automated Test Suite
-        run: |
-          npm test || echo "Test suite completed with cloud network notice. Continuing to build..."
+      - name: Run Static Analysis (ESLint)
+        run: npm run lint
+
+      - name: Run TypeScript Type Check
+        run: npm run typecheck
+
+      - name: Run Automated Test Suite (Hermetic & CI Ready)
+        run: npm run test:ci
 
       - name: Build Web Application
         run: npm run build
