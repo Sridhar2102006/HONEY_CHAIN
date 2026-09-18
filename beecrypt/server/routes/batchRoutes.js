@@ -5,7 +5,6 @@ import {
   validateBatchCreation,
   validateBatchTransition,
   validateBatchSplit,
-  StateMachineError,
 } from '../services/batchStateMachine.js';
 
 const router = Router();

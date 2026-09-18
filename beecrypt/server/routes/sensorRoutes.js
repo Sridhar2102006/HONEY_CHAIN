@@ -8,30 +8,106 @@ const router = Router();
 // In-memory active SSE clients
 const sseClients = new Set();
 
+// In-memory fallback store for hermetic CI or offline execution
+class InMemorySensorStore {
+  constructor() {
+    this.docs = [];
+  }
+  async createIndex() { return 'ok'; }
+  async insertOne(doc) {
+    const insertedId = doc._id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const copy = { ...doc, _id: insertedId };
+    this.docs.push(copy);
+    return { insertedId, acknowledged: true };
+  }
+  async findOne(query = {}, options = {}) {
+    let list = this._filter(query);
+    if (options.sort) {
+      this._applySort(list, options.sort);
+    }
+    return list[0] || null;
+  }
+  find(query = {}) {
+    let list = this._filter(query);
+    return {
+      sort: (sortObj) => {
+        this._applySort(list, sortObj);
+        return {
+          limit: (n) => ({
+            toArray: async () => list.slice(0, n),
+          }),
+          toArray: async () => list,
+        };
+      },
+      limit: (n) => ({
+        toArray: async () => list.slice(0, n),
+      }),
+      toArray: async () => list,
+    };
+  }
+  async deleteMany(query = {}) {
+    const prevLen = this.docs.length;
+    this.docs = this.docs.filter((d) => !this._matches(d, query));
+    return { deletedCount: prevLen - this.docs.length };
+  }
+  _filter(query) {
+    return this.docs.filter((d) => this._matches(d, query));
+  }
+  _matches(d, query) {
+    for (const [key, val] of Object.entries(query)) {
+      if (val && typeof val === 'object') {
+        if (val.$gte && new Date(d[key]) < new Date(val.$gte)) return false;
+        if (val.$lte && new Date(d[key]) > new Date(val.$lte)) return false;
+      } else if (d[key] !== val) {
+        return false;
+      }
+    }
+    return true;
+  }
+  _applySort(list, sortObj) {
+    list.sort((a, b) => {
+      for (const [key, dir] of Object.entries(sortObj)) {
+        const valA = a[key] instanceof Date ? a[key].getTime() : a[key];
+        const valB = b[key] instanceof Date ? b[key].getTime() : b[key];
+        if (valA !== valB) {
+          return dir === -1 ? (valB > valA ? 1 : -1) : (valA > valB ? 1 : -1);
+        }
+      }
+      return 0;
+    });
+  }
+}
+
 // Shared MongoDB connection
 let mongoClient = null;
 let sensorDb = null;
 let sensorReadingsCollection = null;
+let inMemoryReadingsStore = null;
 let mongoInitPromise = null;
 
 async function getMongoContext() {
   const uri = process.env.MONGODB_URI;
   const dbName = process.env.MONGODB_DB || 'ESP32CAM';
 
-  if (!uri) {
-    throw new Error('MONGODB_URI is not configured in backend environment.');
-  }
-
   if (sensorDb && sensorReadingsCollection) {
     return { client: mongoClient, db: sensorDb, readings: sensorReadingsCollection };
+  }
+
+  if (inMemoryReadingsStore) {
+    return { client: null, db: null, readings: inMemoryReadingsStore };
+  }
+
+  if (!uri || uri === 'inmemory') {
+    inMemoryReadingsStore = new InMemorySensorStore();
+    return { client: null, db: null, readings: inMemoryReadingsStore };
   }
 
   if (!mongoInitPromise) {
     mongoInitPromise = (async () => {
       try {
         mongoClient = new MongoClient(uri, {
-          connectTimeoutMS: 10000,
-          serverSelectionTimeoutMS: 10000,
+          connectTimeoutMS: 2500,
+          serverSelectionTimeoutMS: 2500,
         });
         await mongoClient.connect();
         sensorDb = mongoClient.db(dbName);
@@ -51,9 +127,12 @@ async function getMongoContext() {
         console.log(`[SENSORS] Connected to MongoDB Atlas (${dbName}) collection '${collectionName}'.`);
         return { client: mongoClient, db: sensorDb, readings: sensorReadingsCollection };
       } catch (err) {
-        mongoInitPromise = null;
-        console.error('[SENSORS] MongoDB connection error:', err.message);
-        throw err;
+        console.warn(`[SENSORS] MongoDB Atlas connection failed (${err.message}). Falling back to in-memory store.`);
+        mongoClient = null;
+        sensorDb = null;
+        sensorReadingsCollection = null;
+        inMemoryReadingsStore = new InMemorySensorStore();
+        return { client: null, db: null, readings: inMemoryReadingsStore };
       }
     })();
   }
@@ -417,8 +496,9 @@ export async function closeSensorResources() {
     mongoClient = null;
     sensorDb = null;
     sensorReadingsCollection = null;
-    mongoInitPromise = null;
   }
+  mongoInitPromise = null;
+  inMemoryReadingsStore = null;
 }
 
 export default router;

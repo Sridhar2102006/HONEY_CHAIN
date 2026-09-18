@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AppRoutes from "./routes/AppRoutes.jsx";
 import SplashScreen from "./components/mobile/SplashScreen.jsx";

@@ -33,8 +33,8 @@ export class StateMachineError extends Error {
 /**
  * Validates batch creation parameters.
  */
-export function validateBatchCreation(payload, user) {
-  const { quantity, harvestDate, hiveId } = payload;
+export function validateBatchCreation(payload, _user) {
+  const { quantity, harvestDate } = payload;
 
   if (quantity === undefined || quantity === null) {
     throw new StateMachineError('Batch quantity is required', 400);

@@ -97,7 +97,7 @@ export const query = async (text, params) => {
   if (isNeon) {
     try {
       return await queryNeonHttp(text, params);
-    } catch (neonErr) {
+    } catch {
       // Fallback to native pool if HTTP fails
       return nativePool.query(text, params);
     }

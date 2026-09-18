@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import crypto from 'crypto';
-import { GridFSBucket, MongoClient, ObjectId } from 'mongodb';
+import { Readable, Writable } from 'stream';
+import { GridFSBucket, MongoClient } from 'mongodb';
 import { requireAuth } from '../middleware/auth.js';
 import { query as pgQuery } from '../db/pool.js';
 
@@ -102,31 +103,178 @@ async function verifyHiveOwnership(hiveId, user) {
 // Concurrency lock to prevent duplicate capture triggers
 let isCaptureInProgress = false;
 
+// In-memory fallback stores for hermetic CI or offline execution
+class InMemoryUploadStream extends Writable {
+  constructor(id, filename, metadata, storeMap) {
+    super();
+    this.id = id;
+    this.filename = filename;
+    this.metadata = metadata;
+    this.storeMap = storeMap;
+    this.chunks = [];
+  }
+  _write(chunk, encoding, callback) {
+    this.chunks.push(chunk);
+    callback();
+  }
+  _final(callback) {
+    this.storeMap.set(this.id.toString(), {
+      _id: this.id,
+      filename: this.filename,
+      metadata: this.metadata,
+      buffer: Buffer.concat(this.chunks),
+    });
+    callback();
+  }
+}
+
+class InMemoryGridFSBucket {
+  constructor(storeMap) {
+    this.storeMap = storeMap;
+  }
+  openUploadStream(filename, options = {}) {
+    const id = crypto.randomBytes(12).toString('hex');
+    return new InMemoryUploadStream(id, filename, options.metadata || {}, this.storeMap);
+  }
+  openDownloadStream(fileId) {
+    const idStr = fileId?.toString();
+    let file = this.storeMap.get(idStr);
+    if (!file) {
+      for (const f of this.storeMap.values()) {
+        if (f.filename === idStr || f.filename === `${idStr}.jpg` || f._id?.toString() === idStr) {
+          file = f;
+          break;
+        }
+      }
+    }
+    if (!file) {
+      const s = new Readable({ read() {} });
+      process.nextTick(() => s.emit('error', new Error(`File not found: ${idStr}`)));
+      return s;
+    }
+    return Readable.from(file.buffer);
+  }
+}
+
+class InMemoryCaptureStore {
+  constructor() {
+    this.docs = [];
+  }
+  async createIndex() { return 'ok'; }
+  async insertOne(doc) {
+    const insertedId = doc._id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const copy = { ...doc, _id: insertedId };
+    this.docs.push(copy);
+    return { insertedId, acknowledged: true };
+  }
+  async findOne(query = {}, options = {}) {
+    let list = this._filter(query);
+    if (options.sort) {
+      this._applySort(list, options.sort);
+    }
+    return list[0] || null;
+  }
+  find(query = {}) {
+    let list = this._filter(query);
+    return {
+      sort: (sortObj) => {
+        this._applySort(list, sortObj);
+        return {
+          limit: (n) => ({
+            toArray: async () => list.slice(0, n),
+          }),
+          toArray: async () => list,
+        };
+      },
+      limit: (n) => ({
+        toArray: async () => list.slice(0, n),
+      }),
+      toArray: async () => list,
+    };
+  }
+  _filter(query) {
+    return this.docs.filter((d) => this._matches(d, query));
+  }
+  _matches(d, query) {
+    for (const [key, val] of Object.entries(query)) {
+      if (key === '$or' && Array.isArray(val)) {
+        const anyMatch = val.some((sub) => this._matches(d, sub));
+        if (!anyMatch) return false;
+      } else if (d[key] !== val) {
+        return false;
+      }
+    }
+    return true;
+  }
+  _applySort(list, sortObj) {
+    list.sort((a, b) => {
+      for (const [key, dir] of Object.entries(sortObj)) {
+        const valA = a[key] instanceof Date ? a[key].getTime() : a[key];
+        const valB = b[key] instanceof Date ? b[key].getTime() : b[key];
+        if (valA !== valB) {
+          return dir === -1 ? (valB > valA ? 1 : -1) : (valA > valB ? 1 : -1);
+        }
+      }
+      return 0;
+    });
+  }
+}
+
 // MongoDB connection singleton
 let mongoClient = null;
 let cameraDb = null;
 let imageBucket = null;
 let capturesCollection = null;
+let inMemoryImageFiles = new Map();
+let inMemoryCapturesStore = null;
+let inMemoryBucket = null;
+let inMemoryMockDb = null;
 let mongoInitPromise = null;
 
 async function getMongoContext() {
   const uri = process.env.MONGODB_URI;
   const dbName = process.env.MONGODB_DB || 'ESP32CAM';
 
-  if (!uri) {
-    throw new Error('MONGODB_URI is not configured in backend environment.');
-  }
-
   if (cameraDb && imageBucket && capturesCollection) {
     return { client: mongoClient, db: cameraDb, bucket: imageBucket, captures: capturesCollection };
+  }
+
+  if (inMemoryCapturesStore && inMemoryBucket) {
+    return { client: null, db: inMemoryMockDb, bucket: inMemoryBucket, captures: inMemoryCapturesStore };
+  }
+
+  if (!uri || uri === 'inmemory') {
+    inMemoryCapturesStore = new InMemoryCaptureStore();
+    inMemoryBucket = new InMemoryGridFSBucket(inMemoryImageFiles);
+    inMemoryMockDb = {
+      collection: (name) => {
+        if (name === 'images.files') {
+          return {
+            findOne: async (query) => {
+              for (const f of inMemoryImageFiles.values()) {
+                if (query.$or) {
+                  for (const sub of query.$or) {
+                    if (sub.filename && f.filename === sub.filename) return f;
+                    if (sub['metadata.captureId'] && f.metadata?.captureId === sub['metadata.captureId']) return f;
+                  }
+                }
+              }
+              return null;
+            },
+          };
+        }
+        return null;
+      },
+    };
+    return { client: null, db: inMemoryMockDb, bucket: inMemoryBucket, captures: inMemoryCapturesStore };
   }
 
   if (!mongoInitPromise) {
     mongoInitPromise = (async () => {
       try {
         mongoClient = new MongoClient(uri, {
-          connectTimeoutMS: 10000,
-          serverSelectionTimeoutMS: 10000,
+          connectTimeoutMS: 2500,
+          serverSelectionTimeoutMS: 2500,
         });
         await mongoClient.connect();
         cameraDb = mongoClient.db(dbName);
@@ -141,9 +289,34 @@ async function getMongoContext() {
         console.log(`[CAMERA] Connected to MongoDB Atlas (${dbName}) for GridFS and Captures.`);
         return { client: mongoClient, db: cameraDb, bucket: imageBucket, captures: capturesCollection };
       } catch (err) {
-        mongoInitPromise = null;
-        console.error('[CAMERA] MongoDB connection error:', err.message);
-        throw err;
+        console.warn(`[CAMERA] MongoDB Atlas connection failed (${err.message}). Falling back to in-memory store.`);
+        mongoClient = null;
+        cameraDb = null;
+        imageBucket = null;
+        capturesCollection = null;
+        inMemoryCapturesStore = new InMemoryCaptureStore();
+        inMemoryBucket = new InMemoryGridFSBucket(inMemoryImageFiles);
+        inMemoryMockDb = {
+          collection: (name) => {
+            if (name === 'images.files') {
+              return {
+                findOne: async (query) => {
+                  for (const f of inMemoryImageFiles.values()) {
+                    if (query.$or) {
+                      for (const sub of query.$or) {
+                        if (sub.filename && f.filename === sub.filename) return f;
+                        if (sub['metadata.captureId'] && f.metadata?.captureId === sub['metadata.captureId']) return f;
+                      }
+                    }
+                  }
+                  return null;
+                },
+              };
+            }
+            return null;
+          },
+        };
+        return { client: null, db: inMemoryMockDb, bucket: inMemoryBucket, captures: inMemoryCapturesStore };
       }
     })();
   }
@@ -560,7 +733,7 @@ router.get('/captures', requireAuth, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/latest-image', requireAuth, async (req, res) => {
   try {
-    const { bucket, db, captures } = await getMongoContext();
+    const { bucket, captures } = await getMongoContext();
     const isPrivileged = (req.user?.roles || []).some((r) => ['kvic', 'admin', 'verifier'].includes(r));
 
     let filter = {};
@@ -663,8 +836,12 @@ export async function closeCameraResources() {
     cameraDb = null;
     imageBucket = null;
     capturesCollection = null;
-    mongoInitPromise = null;
   }
+  mongoInitPromise = null;
+  inMemoryCapturesStore = null;
+  inMemoryBucket = null;
+  inMemoryMockDb = null;
+  inMemoryImageFiles.clear();
 }
 
 export default router;

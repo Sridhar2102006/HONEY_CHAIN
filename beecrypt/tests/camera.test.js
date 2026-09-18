@@ -86,8 +86,8 @@ describe('ESP32-CAM → Backend → MongoDB Integration Tests', () => {
 
     // 3. Point backend to mock camera
     process.env.ESP32_IP = `http://127.0.0.1:${mockPort}`;
-    process.env.MONGODB_URI = 'mongodb+srv://esp32_user:honeychain2026@esp32cluster.w7u0bdo.mongodb.net/?appName=ESP32Cluster';
-    process.env.MONGODB_DB = 'ESP32CAM';
+    process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://esp32_user:honeychain2026@esp32cluster.w7u0bdo.mongodb.net/?appName=ESP32Cluster';
+    process.env.MONGODB_DB = process.env.MONGODB_DB || 'ESP32CAM';
 
     // 4. Spin up ephemeral Express test app mounting cameraRoutes
     testApp = express();
