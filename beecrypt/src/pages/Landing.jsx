@@ -164,7 +164,7 @@ export default function Landing() {
               to="/login"
               className="inline-block w-full py-3 rounded-2xl bg-gradient-to-r from-bc-gold to-bc-amber text-bc-dark font-bold text-xs shadow-md active:scale-95 transition-transform"
             >
-              Explore Demo Accounts
+              Access Role Workspaces
             </Link>
           </div>
         </div>

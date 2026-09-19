@@ -14,12 +14,12 @@ function hashString(str = "") {
 }
 
 const FALLBACK_SEED_HIVES = [
-  { hiveId: "H-1024", producerId: "BK-001", region: "Erode", block: "Apiary A — Block 03", status: "healthy", temp: 34.8, humidity: 61, vibration: 0.32, sensor: "online", battery: 87 },
-  { hiveId: "H-1025", producerId: "BK-001", region: "Erode", block: "Apiary A — Block 04", status: "healthy", temp: 35.1, humidity: 58, vibration: 0.29, sensor: "online", battery: 92 },
-  { hiveId: "H-1026", producerId: "BK-001", region: "Erode", block: "Apiary B — Block 01", status: "warning", temp: 37.6, humidity: 68, vibration: 0.41, sensor: "online", battery: 74 },
-  { hiveId: "H-1030", producerId: "BK-001", region: "Erode", block: "Apiary B — Block 02", status: "critical", temp: 39.2, humidity: 82, vibration: 0.58, sensor: "online", battery: 21 },
-  { hiveId: "H-1032", producerId: "BK-001", region: "Erode", block: "Apiary A — Block 05", status: "healthy", temp: 34.5, humidity: 60, vibration: 0.31, sensor: "online", battery: 95 },
-  { hiveId: "H-2011", producerId: "BK-045", region: "Salem", block: "Apiary C — Block 01", status: "healthy", temp: 34.2, humidity: 57, vibration: 0.27, sensor: "online", battery: 88 },
+  { hiveId: "H-1024", producerId: "BK-001", region: "Tamil Nadu", block: "Apiary A — Block 03", status: "healthy", temp: 34.8, humidity: 61, vibration: 0.32, sensor: "online", battery: 87 },
+  { hiveId: "H-1025", producerId: "BK-001", region: "Tamil Nadu", block: "Apiary A — Block 04", status: "healthy", temp: 35.1, humidity: 58, vibration: 0.29, sensor: "online", battery: 92 },
+  { hiveId: "H-1026", producerId: "BK-001", region: "Tamil Nadu", block: "Apiary B — Block 01", status: "warning", temp: 37.6, humidity: 68, vibration: 0.41, sensor: "online", battery: 74 },
+  { hiveId: "H-1030", producerId: "BK-001", region: "Tamil Nadu", block: "Apiary B — Block 02", status: "critical", temp: 39.2, humidity: 82, vibration: 0.58, sensor: "online", battery: 21 },
+  { hiveId: "H-1032", producerId: "BK-001", region: "Tamil Nadu", block: "Apiary A — Block 05", status: "healthy", temp: 34.5, humidity: 60, vibration: 0.31, sensor: "online", battery: 95 },
+  { hiveId: "H-2011", producerId: "BK-045", region: "Tamil Nadu", block: "Apiary C — Block 01", status: "healthy", temp: 34.2, humidity: 57, vibration: 0.27, sensor: "online", battery: 88 },
 ];
 
 export function listHives(producerId) {

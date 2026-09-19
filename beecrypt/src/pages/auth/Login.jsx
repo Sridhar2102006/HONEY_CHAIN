@@ -40,7 +40,7 @@ export default function Login() {
       await login(demoEmail, "demo123");
       navigate("/app");
     } catch (err) {
-      setError(err.message || "Failed to sign in to demo account.");
+      setError(err.message || "Failed to sign in to account.");
     } finally {
       setLoading(false);
       setActiveDemoEmail(null);
@@ -65,7 +65,7 @@ export default function Login() {
       await login(email, password);
       navigate("/app");
     } catch (err) {
-      setError(err.message || "Invalid email or password. Please check your credentials or select a demo account below.");
+      setError(err.message || "Invalid email or password. Please check your credentials or select a role workspace below.");
     } finally {
       setLoading(false);
     }

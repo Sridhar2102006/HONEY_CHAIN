@@ -156,7 +156,7 @@ export default function RetailerVerifyIntake() {
                 <span className="text-[#657365]">2. Processing Facility:</span>
                 <span className="font-semibold text-[#1F4D2E] flex items-center gap-1">
                   <CheckCircle2 size={13} className="text-[#2F6B3F]" />
-                  {searchedBatch.processorId || "PR-001 (Green Valley)"}
+                  {searchedBatch.processorId || "PR-001 (HoneyChain Processing)"}
                 </span>
               </div>
 

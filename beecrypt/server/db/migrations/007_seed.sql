@@ -3,24 +3,24 @@
 
 -- 1. Organizations
 INSERT INTO organizations (org_id, name, type, region) VALUES
-  ('ORG-101', 'Kumar Apiaries', 'beekeeper', 'Erode'),
-  ('ORG-202', 'Green Valley Honey', 'processor', 'Coimbatore'),
-  ('ORG-303', 'ABC Food Testing Laboratory', 'laboratory', 'Chennai'),
-  ('ORG-401', 'Nilgiris Fresh Mart', 'retailer', 'Coimbatore'),
-  ('ORG-001', 'Khadi & Village Industries Commission', 'kvic', 'New Delhi'),
-  ('ORG-501', 'Arun Honey Collective', 'multi', 'Salem')
+  ('ORG-101', 'HoneyChain Apiary Network', 'beekeeper', 'Tamil Nadu'),
+  ('ORG-202', 'HoneyChain Processing Facility', 'processor', 'Tamil Nadu'),
+  ('ORG-303', 'National Quality Testing Laboratory', 'laboratory', 'Chennai'),
+  ('ORG-401', 'HoneyChain Retail Center', 'retailer', 'Tamil Nadu'),
+  ('ORG-001', 'Khadi & Village Industries Commission (KVIC)', 'kvic', 'New Delhi'),
+  ('ORG-501', 'HoneyChain State Cooperative', 'multi', 'Tamil Nadu')
 ON CONFLICT (org_id) DO NOTHING;
 
 -- 2. Demo Users
 INSERT INTO users (actor_id, org_id, name, email, password_hash, roles, org, region, location, multi_actor_ids) VALUES
-  ('BK-001', 'ORG-101', 'Rajesh Kumar', 'beekeeper@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['beekeeper'], 'Kumar Apiaries', 'Erode', 'Erode, Tamil Nadu', NULL),
-  ('PR-001', 'ORG-202', 'Meena Iyer', 'processor@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['processor'], 'Green Valley Honey', 'Coimbatore', 'Coimbatore, Tamil Nadu', NULL),
-  ('LAB-001', 'ORG-303', 'Dr. Ashok Rao', 'lab@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['laboratory'], 'ABC Food Testing Laboratory', 'Chennai', 'Chennai, Tamil Nadu', NULL),
-  ('KVIC-001', 'ORG-001', 'KVIC Regional Office', 'admin@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['kvic'], 'Khadi & Village Industries Commission', 'New Delhi', 'New Delhi', NULL),
-  ('RET-001', 'ORG-401', 'Priya Sharma', 'retailer@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['retailer'], 'Nilgiris Fresh Mart', 'Coimbatore', 'Coimbatore, Tamil Nadu', NULL),
-  ('LAB-002', 'ORG-303', 'Dr. Ashok Rao (Verifier)', 'verifier@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['laboratory'], 'ABC Food Testing & Verifier Lab', 'Chennai', 'Chennai, Tamil Nadu', NULL),
-  ('ORG-501', 'ORG-501', 'Arun Kumar', 'multi@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['beekeeper', 'processor', 'laboratory', 'retailer', 'kvic'], 'Arun Honey Collective', 'Salem', 'Salem, Tamil Nadu', '{"beekeeper": "BK-045", "processor": "PR-045", "laboratory": "LAB-045", "retailer": "RET-001", "kvic": "KVIC-001"}'::jsonb),
-  ('BK-045', 'ORG-501', 'Arun Kumar (Beekeeper)', 'arun.beekeeper@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['beekeeper'], 'Arun Honey Collective', 'Salem', 'Salem, Tamil Nadu', NULL)
+  ('BK-001', 'ORG-101', 'Lead Beekeeper', 'beekeeper@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['beekeeper'], 'HoneyChain Apiary Network', 'Tamil Nadu', 'Tamil Nadu, India', NULL),
+  ('PR-001', 'ORG-202', 'Processing Supervisor', 'processor@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['processor'], 'HoneyChain Processing Facility', 'Tamil Nadu', 'Tamil Nadu, India', NULL),
+  ('LAB-001', 'ORG-303', 'Quality Analyst', 'lab@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['laboratory'], 'National Quality Testing Laboratory', 'Chennai', 'Chennai, India', NULL),
+  ('KVIC-001', 'ORG-001', 'KVIC Regulatory Officer', 'admin@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['kvic'], 'Khadi & Village Industries Commission', 'New Delhi', 'New Delhi, India', NULL),
+  ('RET-001', 'ORG-401', 'Retail Manager', 'retailer@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['retailer'], 'HoneyChain Retail Center', 'Tamil Nadu', 'Tamil Nadu, India', NULL),
+  ('LAB-002', 'ORG-303', 'Quality Verifier', 'verifier@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['laboratory'], 'National Quality Testing Laboratory', 'Chennai', 'Chennai, India', NULL),
+  ('ORG-501', 'ORG-501', 'Operations Lead', 'multi@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['beekeeper', 'processor', 'laboratory', 'retailer', 'kvic'], 'HoneyChain State Cooperative', 'Tamil Nadu', 'Tamil Nadu, India', '{"beekeeper": "BK-045", "processor": "PR-045", "laboratory": "LAB-045", "retailer": "RET-001", "kvic": "KVIC-001"}'::jsonb),
+  ('BK-045', 'ORG-501', 'Operations Beekeeper', 'arun.beekeeper@beecrypt.demo', '$2a$10$tZyXrb7/rkYlDa2YrrtHW.8aL825hC169JGMLn3FH626uhQaL4H.2', ARRAY['beekeeper'], 'HoneyChain State Cooperative', 'Tamil Nadu', 'Tamil Nadu, India', NULL)
 ON CONFLICT (email) DO NOTHING;
 
 -- 3. Hives
@@ -43,9 +43,9 @@ ON CONFLICT (inspection_id) DO NOTHING;
 
 -- 5. Batches
 INSERT INTO batches (batch_id, producer_id, producer_name, hive_id, region, honey_type, floral_source, harvest_date, quantity, processor_id, processing_method, processing_status, lab_id, test_status, certificate_id, cert_status, stage, parent_batch_id) VALUES
-  ('BEE-2026-001024', 'BK-001', 'Rajesh Kumar', 'H-1024', 'Erode', 'Multifloral', 'Eucalyptus / Wildflower', '2026-09-04', 18.5, 'PR-001', 'Cold Extraction', 'Completed', 'LAB-001', 'PASS', 'AGMARK-2026-001024', 'CERTIFIED', 6, NULL),
-  ('BEE-2026-000998', 'BK-001', 'Rajesh Kumar', 'H-1025', 'Erode', 'Forest Honey', 'Mixed Forest Bloom', '2026-08-29', 22.0, 'PR-001', NULL, 'In Progress', NULL, 'PENDING', NULL, 'PENDING', 2, NULL),
-  ('BEE-2026-000971', 'BK-001', 'Rajesh Kumar', 'H-1032', 'Erode', 'Multifloral', 'Coriander / Wildflower', '2026-08-22', 15.2, 'PR-001', 'Cold Extraction', 'Completed', 'LAB-002', 'PENDING', NULL, 'PENDING', 4, NULL)
+  ('BEE-2026-001024', 'BK-001', 'Lead Beekeeper', 'H-1024', 'Tamil Nadu', 'Multifloral', 'Eucalyptus / Wildflower', '2026-09-04', 18.5, 'PR-001', 'Cold Extraction', 'Completed', 'LAB-001', 'PASS', 'AGMARK-2026-001024', 'CERTIFIED', 6, NULL),
+  ('BEE-2026-000998', 'BK-001', 'Lead Beekeeper', 'H-1025', 'Tamil Nadu', 'Forest Honey', 'Mixed Forest Bloom', '2026-08-29', 22.0, 'PR-001', NULL, 'In Progress', NULL, 'PENDING', NULL, 'PENDING', 2, NULL),
+  ('BEE-2026-000971', 'BK-001', 'Lead Beekeeper', 'H-1032', 'Tamil Nadu', 'Multifloral', 'Coriander / Wildflower', '2026-08-22', 15.2, 'PR-001', 'Cold Extraction', 'Completed', 'LAB-002', 'PENDING', NULL, 'PENDING', 4, NULL)
 ON CONFLICT (batch_id) DO NOTHING;
 
 -- 6. Provenance Events

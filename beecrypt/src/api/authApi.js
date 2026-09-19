@@ -33,6 +33,14 @@ export const authApi = {
   async verifyOtp(email, otp, purpose = 'VERIFY_EMAIL') {
     return apiClient.post('/auth/verify-otp', { email, otp, purpose });
   },
+
+  async updateProfile(profileData) {
+    const data = await apiClient.patch('/auth/profile', profileData);
+    if (data.token) {
+      await storageService.setToken(data.token);
+    }
+    return data;
+  },
 };
 
 export default authApi;

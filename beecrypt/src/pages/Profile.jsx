@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   User, CheckCircle2, ShieldCheck, Settings as SettingsIcon, 
-  LogOut, ChevronRight, Layers, MapPin, Building, Sparkles 
+  LogOut, ChevronRight, Layers, MapPin, Building, Sparkles,
+  Edit3, Save, X
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth.js";
 import PageHeader from "../components/PageHeader.jsx";
@@ -11,9 +12,41 @@ import { initials } from "../utils/format.js";
 import BottomSheet from "../components/mobile/BottomSheet.jsx";
 
 export default function Profile() {
-  const { currentUser, currentActorId, workspace, switchWorkspace, logout } = useAuth();
+  const { currentUser, currentActorId, workspace, switchWorkspace, updateUserProfile, logout } = useAuth();
   const navigate = useNavigate();
   const [roleSheetOpen, setRoleSheetOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Edit profile form state
+  const [editName, setEditName] = useState(currentUser?.name || "");
+  const [editOrg, setEditOrg] = useState(currentUser?.org || "");
+  const [editLocation, setEditLocation] = useState(currentUser?.location || "");
+  const [editRegion, setEditRegion] = useState(currentUser?.region || "");
+  const [saving, setSaving] = useState(false);
+
+  const openEditModal = () => {
+    setEditName(currentUser?.name || "");
+    setEditOrg(currentUser?.org || "");
+    setEditLocation(currentUser?.location || "");
+    setEditRegion(currentUser?.region || "");
+    setEditModalOpen(true);
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await updateUserProfile({
+        name: editName.trim(),
+        org: editOrg.trim(),
+        location: editLocation.trim(),
+        region: editRegion.trim(),
+      });
+      setEditModalOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const doLogout = () => {
     logout();
@@ -31,27 +64,37 @@ export default function Profile() {
       <PageHeader title="Account &amp; Profile" sub="Manage your profile, workspaces, and apiary credentials." />
 
       {/* User Hero Card */}
-      <div className="bg-white rounded-3xl border border-[#ECE6D6] p-5 shadow-xs flex items-center gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-bc-deep-green to-bc-forest text-white flex items-center justify-center font-display font-bold text-xl shadow-md shrink-0">
-          {initials(currentUser.name)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h3 className="font-display font-bold text-lg text-bc-deep-green truncate">
-              {currentUser.name}
-            </h3>
-            <CheckCircle2 size={16} className="text-bc-success shrink-0" title="Demo account" />
+      <div className="bg-white rounded-3xl border border-[#ECE6D6] p-5 shadow-xs flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-bc-deep-green to-bc-forest text-white flex items-center justify-center font-display font-bold text-xl shadow-md shrink-0">
+            {initials(currentUser?.name)}
           </div>
-          <p className="text-xs text-[#8A9086] truncate">{currentUser.org}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[11px] font-mono font-bold bg-[#F3F1E8] text-bc-forest px-2 py-0.5 rounded-md">
-              {currentActorId}
-            </span>
-            <span className="text-[11px] font-bold text-bc-success bg-bc-light-green px-2 py-0.5 rounded-full">
-              Demo account
-            </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-display font-bold text-lg text-bc-deep-green truncate">
+                {currentUser?.name}
+              </h3>
+              <CheckCircle2 size={16} className="text-bc-success shrink-0" title="Verified Account" />
+            </div>
+            <p className="text-xs text-[#8A9086] truncate">{currentUser?.org}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] font-mono font-bold bg-[#F3F1E8] text-bc-forest px-2 py-0.5 rounded-md">
+                {currentActorId}
+              </span>
+              <span className="text-[11px] font-bold text-bc-success bg-bc-light-green px-2 py-0.5 rounded-full">
+                Verified Account
+              </span>
+            </div>
           </div>
         </div>
+        <button
+          onClick={openEditModal}
+          className="shrink-0 p-2.5 rounded-2xl bg-[#F8F6EC] hover:bg-bc-light-honey border border-[#ECE6D6] text-bc-deep-green font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-all"
+          title="Edit Profile"
+        >
+          <Edit3 size={15} />
+          <span className="hidden sm:inline">Edit</span>
+        </button>
       </div>
 
       {/* Active Workspace Card with 1-tap Switcher */}
@@ -191,6 +234,87 @@ export default function Profile() {
             );
           })}
         </div>
+      </BottomSheet>
+
+      {/* Edit Profile BottomSheet */}
+      <BottomSheet
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        title="Edit Profile Identity"
+      >
+        <form onSubmit={handleSaveProfile} className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-bold text-bc-dark mb-1">
+              Full Name / Operator Name
+            </label>
+            <input
+              type="text"
+              required
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="e.g. Your Name"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#ECE6D6] focus:border-bc-deep-green focus:outline-none text-xs font-semibold text-bc-dark bg-[#FAF8F2]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-bc-dark mb-1">
+              Organization / Farm / Apiary Name
+            </label>
+            <input
+              type="text"
+              required
+              value={editOrg}
+              onChange={(e) => setEditOrg(e.target.value)}
+              placeholder="e.g. Primary Apiary"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#ECE6D6] focus:border-bc-deep-green focus:outline-none text-xs font-semibold text-bc-dark bg-[#FAF8F2]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-bc-dark mb-1">
+              Location / State
+            </label>
+            <input
+              type="text"
+              value={editLocation}
+              onChange={(e) => setEditLocation(e.target.value)}
+              placeholder="e.g. Tamil Nadu, India"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#ECE6D6] focus:border-bc-deep-green focus:outline-none text-xs font-semibold text-bc-dark bg-[#FAF8F2]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-bc-dark mb-1">
+              Region / District
+            </label>
+            <input
+              type="text"
+              value={editRegion}
+              onChange={(e) => setEditRegion(e.target.value)}
+              placeholder="e.g. Tamil Nadu"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#ECE6D6] focus:border-bc-deep-green focus:outline-none text-xs font-semibold text-bc-dark bg-[#FAF8F2]"
+            />
+          </div>
+
+          <div className="pt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setEditModalOpen(false)}
+              className="flex-1 py-2.5 rounded-xl border border-[#ECE6D6] text-xs font-bold text-[#8A9086] hover:bg-[#FAF8F2] active:scale-95 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-2.5 rounded-xl bg-bc-deep-green hover:bg-bc-forest text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50"
+            >
+              <Save size={14} />
+              <span>{saving ? "Saving..." : "Save Profile"}</span>
+            </button>
+          </div>
+        </form>
       </BottomSheet>
     </div>
   );

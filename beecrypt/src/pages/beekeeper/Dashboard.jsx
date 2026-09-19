@@ -41,7 +41,7 @@ export default function BeekeeperDashboard() {
       await addHive({
         hiveId: newHiveId.trim().toUpperCase(),
         block: newHiveBlock,
-        region: currentUser?.region || "Erode",
+        region: currentUser?.region || "Tamil Nadu",
       });
       setAddHiveModal(false);
       setNewHiveId("");
@@ -65,10 +65,12 @@ export default function BeekeeperDashboard() {
           </div>
 
           <h2 className="font-display font-bold text-2xl mt-1 tracking-tight">
-            Good day, {currentUser?.name?.split(" ")[0]} 👋
+            {currentUser?.name && !currentUser.name.toLowerCase().includes("rajesh")
+              ? `Good day, ${currentUser.name.split(" ")[0]} 👋`
+              : "Apiary Command Center"}
           </h2>
           <p className="text-xs text-white/80 mt-0.5 flex items-center gap-1">
-            <MapPin size={12} className="text-bc-gold" /> {currentUser?.org} · {currentUser?.location || currentUser?.region}
+            <MapPin size={12} className="text-bc-gold" /> {currentUser?.org && !currentUser.org.toLowerCase().includes("kumar") ? currentUser.org : "HoneyChain Apiary Network"} · {currentUser?.location && !currentUser.location.toLowerCase().includes("erode") ? currentUser.location : (currentUser?.region || "Tamil Nadu, India")}
           </p>
 
           {/* Quick Metrics in Hero */}

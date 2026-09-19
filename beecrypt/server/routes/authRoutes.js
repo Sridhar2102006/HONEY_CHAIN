@@ -103,6 +103,71 @@ router.get('/me', requireAuth, async (req, res, next) => {
   }
 });
 
+// PATCH /api/v1/auth/profile
+router.patch('/profile', requireAuth, async (req, res, next) => {
+  try {
+    const { name, org, location, region } = req.body;
+    const actorId = req.user.actorId;
+
+    const { rows } = await query(
+      `UPDATE users
+       SET name = COALESCE($1, name),
+           org = COALESCE($2, org),
+           location = COALESCE($3, location),
+           region = COALESCE($4, region)
+       WHERE actor_id = $5
+       RETURNING *`,
+      [name || null, org || null, location || null, region || null, actorId]
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = rows[0];
+
+    // If organization is present, also keep organizations table in sync
+    if (user.org_id && (org || region)) {
+      await query(
+        `UPDATE organizations
+         SET name = COALESCE($1, name),
+             region = COALESCE($2, region)
+         WHERE org_id = $3`,
+        [org || null, region || null, user.org_id]
+      ).catch(() => {});
+    }
+
+    const payload = {
+      actorId: user.actor_id,
+      orgId: user.org_id,
+      name: user.name,
+      email: user.email,
+      roles: user.roles,
+      org: user.org,
+      region: user.region,
+      location: user.location,
+      multiActorIds: user.multi_actor_ids,
+    };
+
+    const token = generateToken(payload);
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: payload,
+      token,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/v1/auth/register
 router.post('/register', async (req, res, next) => {
   try {

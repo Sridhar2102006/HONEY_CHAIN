@@ -47,7 +47,7 @@ export default function HiveManagement() {
       await addHive({
         hiveId,
         block: newHiveBlock,
-        region: currentUser?.region || "Erode",
+        region: currentUser?.region || "Tamil Nadu",
       });
       setAddModal(false);
       setNewHiveId("");

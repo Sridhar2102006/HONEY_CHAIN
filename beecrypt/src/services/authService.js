@@ -127,3 +127,7 @@ export async function resendOtp(email) {
     return { success: true, message: "A new 6-digit verification code has been dispatched." };
   }
 }
+
+export async function updateProfile(profileData) {
+  return authApi.updateProfile(profileData);
+}

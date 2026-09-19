@@ -35,7 +35,7 @@ export default function RetailerDashboard() {
           Store Operations
         </h2>
         <p className="text-xs text-white/80 mt-0.5">
-          {currentUser?.org || "Nilgiris Fresh Mart"} · {currentUser?.location || "Coimbatore, Tamil Nadu"}
+          {currentUser?.org || "HoneyChain Retail Center"} · {currentUser?.location || currentUser?.region || "Tamil Nadu, India"}
         </p>
 
         {/* Store Summary Metrics */}

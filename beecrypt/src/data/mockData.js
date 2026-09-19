@@ -13,77 +13,77 @@ export const DEMO_USERS = {
   "beekeeper@beecrypt.demo": {
     actorId: "BK-001",
     orgId: "ORG-101",
-    name: "Rajesh Kumar",
+    name: "Lead Beekeeper",
     roles: ["beekeeper"],
-    org: "Kumar Apiaries",
-    region: "Erode",
-    location: "Erode, Tamil Nadu",
+    org: "HoneyChain Apiary Network",
+    region: "Tamil Nadu",
+    location: "Tamil Nadu, India",
   },
   "processor@beecrypt.demo": {
     actorId: "PR-001",
     orgId: "ORG-202",
-    name: "Meena Iyer",
+    name: "Processing Supervisor",
     roles: ["processor"],
-    org: "Green Valley Honey",
-    region: "Coimbatore",
-    location: "Coimbatore, Tamil Nadu",
+    org: "HoneyChain Processing Facility",
+    region: "Tamil Nadu",
+    location: "Tamil Nadu, India",
   },
   "lab@beecrypt.demo": {
     actorId: "LAB-001",
     orgId: "ORG-303",
-    name: "Dr. Ashok Rao",
+    name: "Quality Analyst",
     roles: ["laboratory"],
-    org: "ABC Food Testing Laboratory",
+    org: "National Quality Testing Laboratory",
     region: "Chennai",
-    location: "Chennai, Tamil Nadu",
+    location: "Chennai, India",
   },
   "admin@beecrypt.demo": {
     actorId: "KVIC-001",
     orgId: "ORG-001",
-    name: "KVIC Regional Office",
+    name: "KVIC Regulatory Officer",
     roles: ["kvic"],
     org: "Khadi & Village Industries Commission",
     region: "New Delhi",
-    location: "New Delhi",
+    location: "New Delhi, India",
   },
   "retailer@beecrypt.demo": {
     actorId: "RET-001",
     orgId: "ORG-401",
-    name: "Priya Sharma",
+    name: "Retail Manager",
     roles: ["retailer"],
-    org: "Nilgiris Fresh Mart",
-    region: "Coimbatore",
-    location: "Coimbatore, Tamil Nadu",
+    org: "HoneyChain Retail Center",
+    region: "Tamil Nadu",
+    location: "Tamil Nadu, India",
   },
   "verifier@beecrypt.demo": {
     actorId: "LAB-001",
     orgId: "ORG-303",
-    name: "Dr. Ashok Rao",
+    name: "Quality Verifier",
     roles: ["laboratory"],
-    org: "ABC Food Testing & Verifier Lab",
+    org: "National Quality Testing Laboratory",
     region: "Chennai",
-    location: "Chennai, Tamil Nadu",
+    location: "Chennai, India",
   },
   "multi@beecrypt.demo": {
     actorId: "ORG-501",
     orgId: "ORG-501",
-    name: "Arun Kumar",
+    name: "Operations Lead",
     roles: ["beekeeper", "processor", "laboratory", "retailer", "kvic"],
-    org: "Arun Honey Collective",
-    region: "Salem",
-    location: "Salem, Tamil Nadu",
+    org: "HoneyChain State Cooperative",
+    region: "Tamil Nadu",
+    location: "Tamil Nadu, India",
     multiActorIds: { beekeeper: "BK-045", processor: "PR-045", laboratory: "LAB-045", retailer: "RET-001", kvic: "KVIC-001" },
   },
 };
 
 // ---- Organizations (Section 6) -----------------------------------------
 export const ORGANIZATIONS = [
-  { orgId: "ORG-101", name: "Kumar Apiaries", type: "beekeeper", region: "Erode" },
-  { orgId: "ORG-202", name: "Green Valley Honey", type: "processor", region: "Coimbatore" },
-  { orgId: "ORG-303", name: "ABC Food Testing Laboratory", type: "laboratory", region: "Chennai" },
-  { orgId: "ORG-401", name: "Nilgiris Fresh Mart", type: "retailer", region: "Coimbatore" },
-  { orgId: "ORG-001", name: "Khadi & Village Industries Commission", type: "kvic", region: "New Delhi" },
-  { orgId: "ORG-501", name: "Arun Honey Collective", type: "multi", region: "Salem" },
+  { orgId: "ORG-101", name: "HoneyChain Apiary Network", type: "beekeeper", region: "Tamil Nadu" },
+  { orgId: "ORG-202", name: "HoneyChain Processing Facility", type: "processor", region: "Tamil Nadu" },
+  { orgId: "ORG-303", name: "National Quality Testing Laboratory", type: "laboratory", region: "Chennai" },
+  { orgId: "ORG-401", name: "HoneyChain Retail Center", type: "retailer", region: "Tamil Nadu" },
+  { orgId: "ORG-001", name: "Khadi & Village Industries Commission (KVIC)", type: "kvic", region: "New Delhi" },
+  { orgId: "ORG-501", name: "HoneyChain State Cooperative", type: "multi", region: "Tamil Nadu" },
 ];
 
 // ---- Hives (Freshly empty for manual feeding) ---------------------------
@@ -105,20 +105,20 @@ export const INITIAL_INSPECTIONS = [];
 
 // ---- Processors / Laboratories / Retailers (directory data) ------------
 export const PROCESSORS = [
-  { processorId: "PR-001", facilityId: "FAC-01", name: "Green Valley Honey", location: "Coimbatore" },
-  { processorId: "PR-045", facilityId: "FAC-02", name: "Arun Honey Collective", location: "Salem" },
+  { processorId: "PR-001", facilityId: "FAC-01", name: "HoneyChain Processing Facility", location: "Tamil Nadu" },
+  { processorId: "PR-045", facilityId: "FAC-02", name: "HoneyChain State Cooperative", location: "Tamil Nadu" },
 ];
 
 export const LABORATORIES = [
-  { labId: "LAB-001", name: "ABC Food Testing Laboratory", location: "Chennai", distance: "4.2 km", accreditation: "NABL Accredited", services: ["Purity", "Moisture", "Adulteration"], available: true },
-  { labId: "LAB-002", name: "GreenLab Food Analytics", location: "Coimbatore", distance: "9.8 km", accreditation: "AGMARK Empanelled", services: ["Purity", "Sugar Profile"], available: true },
-  { labId: "LAB-003", name: "National Honey Quality Lab", location: "Madurai", distance: "15.6 km", accreditation: "NABL Accredited", services: ["Purity", "Moisture", "Sugar Profile", "Adulteration"], available: true },
-  { labId: "LAB-004", name: "Southern Honey Institute", location: "Dindigul", distance: "18.3 km", accreditation: "NABL Accredited", services: ["Moisture", "Adulteration"], available: false },
-  { labId: "LAB-005", name: "Kongu Quality Testing", location: "Namakkal", distance: "21.1 km", accreditation: "AGMARK Empanelled", services: ["Purity"], available: true },
+  { labId: "LAB-001", name: "National Quality Testing Laboratory", location: "Chennai", distance: "4.2 km", accreditation: "NABL Accredited", services: ["Purity", "Moisture", "Adulteration"], available: true },
+  { labId: "LAB-002", name: "Central AGMARK Honey Analytics", location: "Coimbatore", distance: "9.8 km", accreditation: "AGMARK Empanelled", services: ["Purity", "Sugar Profile"], available: true },
+  { labId: "LAB-003", name: "National Honey Quality Directorate Lab", location: "Madurai", distance: "15.6 km", accreditation: "NABL Accredited", services: ["Purity", "Moisture", "Sugar Profile", "Adulteration"], available: true },
+  { labId: "LAB-004", name: "Regional Food Safety Institute", location: "Dindigul", distance: "18.3 km", accreditation: "NABL Accredited", services: ["Moisture", "Adulteration"], available: false },
+  { labId: "LAB-005", name: "State Quality Control Laboratory", location: "Namakkal", distance: "21.1 km", accreditation: "AGMARK Empanelled", services: ["Purity"], available: true },
 ];
 
 export const RETAILERS = [
-  { retailerId: "RET-001", outletId: "OUT-01", name: "Nilgiris Fresh Mart", location: "Coimbatore" },
+  { retailerId: "RET-001", outletId: "OUT-01", name: "HoneyChain Retail Center", location: "Tamil Nadu" },
 ];
 
 // ---- Batches (Freshly empty for manual feeding) -------------------------

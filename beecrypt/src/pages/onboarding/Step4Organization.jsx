@@ -14,7 +14,7 @@ const ROLE_CONFIG = {
     subtitle: "Help us understand your beekeeping operation.",
     fields: [
       { key: "name",     label: "Farm / Apiary Name",  placeholder: "e.g. Honey Valley Apiary", icon: Building2, required: true },
-      { key: "location", label: "Location",             placeholder: "e.g. Nilgiris, Tamil Nadu",  icon: MapPin,    required: false },
+      { key: "location", label: "Location",             placeholder: "e.g. Coimbatore, Tamil Nadu",  icon: MapPin,    required: false },
       { key: "hives",    label: "Number of Hives",      placeholder: "e.g. 24",                   icon: Hash,      required: false, type: "number" },
     ],
   },

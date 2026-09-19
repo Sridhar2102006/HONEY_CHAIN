@@ -40,7 +40,42 @@ export function AppProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const stored = localStorage.getItem("beecrypt_user");
-      return stored ? JSON.parse(stored) : null;
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u && (u.name === "Rajesh Kumar" || u.org === "Kumar Apiaries" || u.region === "Erode")) {
+          u.name = "Lead Beekeeper";
+          u.org = "HoneyChain Apiary Network";
+          u.region = "Tamil Nadu";
+          u.location = "Tamil Nadu, India";
+          try { localStorage.setItem("beecrypt_user", JSON.stringify(u)); } catch {}
+        } else if (u && (u.name === "Meena Iyer" || u.org === "Green Valley Honey")) {
+          u.name = "Processing Supervisor";
+          u.org = "HoneyChain Processing Facility";
+          u.region = "Tamil Nadu";
+          u.location = "Tamil Nadu, India";
+          try { localStorage.setItem("beecrypt_user", JSON.stringify(u)); } catch {}
+        } else if (u && (u.name === "Dr. Ashok Rao" || u.org?.includes("ABC Food"))) {
+          u.name = "Quality Analyst";
+          u.org = "National Quality Testing Laboratory";
+          u.region = "Chennai";
+          u.location = "Chennai, India";
+          try { localStorage.setItem("beecrypt_user", JSON.stringify(u)); } catch {}
+        } else if (u && (u.name === "Priya Sharma" || u.org === "Nilgiris Fresh Mart")) {
+          u.name = "Retail Manager";
+          u.org = "HoneyChain Retail Center";
+          u.region = "Tamil Nadu";
+          u.location = "Tamil Nadu, India";
+          try { localStorage.setItem("beecrypt_user", JSON.stringify(u)); } catch {}
+        } else if (u && (u.name === "Arun Kumar" || u.org === "Arun Honey Collective")) {
+          u.name = "Operations Lead";
+          u.org = "HoneyChain State Cooperative";
+          u.region = "Tamil Nadu";
+          u.location = "Tamil Nadu, India";
+          try { localStorage.setItem("beecrypt_user", JSON.stringify(u)); } catch {}
+        }
+        return u;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -346,6 +381,34 @@ export function AppProvider({ children }) {
     return true;
   }, [currentUser, showToast]);
 
+  const updateUserProfile = useCallback(async (profileData) => {
+    try {
+      const res = await authApi.updateProfile(profileData);
+      if (res && res.user) {
+        setCurrentUser(res.user);
+        try {
+          localStorage.setItem("beecrypt_user", JSON.stringify(res.user));
+        } catch {}
+        showToast("Profile updated successfully!", "success");
+        return res.user;
+      }
+    } catch (err) {
+      const updatedUser = {
+        ...currentUser,
+        ...(profileData.name ? { name: profileData.name } : {}),
+        ...(profileData.org ? { org: profileData.org } : {}),
+        ...(profileData.location ? { location: profileData.location } : {}),
+        ...(profileData.region ? { region: profileData.region } : {}),
+      };
+      setCurrentUser(updatedUser);
+      try {
+        localStorage.setItem("beecrypt_user", JSON.stringify(updatedUser));
+      } catch {}
+      showToast("Profile updated locally.", "success");
+      return updatedUser;
+    }
+  }, [currentUser, showToast]);
+
   const submitRegistration = useCallback(async (formData) => {
     try {
       const res = await authApi.register({
@@ -399,7 +462,7 @@ export function AppProvider({ children }) {
       const newHiveData = {
         hiveId: cleanId,
         producerId: assignedProducer,
-        region: region || currentUser?.region || "Erode",
+        region: region || currentUser?.region || "Tamil Nadu",
         block: block || "Apiary A — Block 06",
         status: "healthy",
         temp: 34.6,
@@ -480,7 +543,7 @@ export function AppProvider({ children }) {
           producerId,
           producerName: currentUser?.name || "Independent Beekeeper",
           hiveId,
-          region: currentUser?.region || hive?.region || "Erode",
+          region: currentUser?.region || hive?.region || "Tamil Nadu",
           honeyType,
           floralSource,
           harvestDate: extractionDate,
@@ -726,6 +789,7 @@ export function AppProvider({ children }) {
     loginWithGoogle,
     logout,
     switchWorkspace,
+    updateUserProfile,
     submitRegistration,
 
     hives,
