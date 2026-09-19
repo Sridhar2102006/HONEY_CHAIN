@@ -51,7 +51,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Prepare Keystore from Secret
         if: env.ANDROID_KEYSTORE_BASE64 != ''
