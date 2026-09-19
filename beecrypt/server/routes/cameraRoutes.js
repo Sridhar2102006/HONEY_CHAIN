@@ -88,18 +88,13 @@ async function verifyHiveOwnership(hiveId, user) {
   if (roles.some((r) => ['kvic', 'admin', 'verifier'].includes(r))) {
     return true;
   }
-  try {
-    const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
-    if (!rows || rows.length === 0) {
-      // In development prototype without seed, allow fallback if specified
-      return process.env.NODE_ENV === 'development';
-    }
-    const ownerId = rows[0].producer_id;
-    return ownerId === user.actorId || ownerId === user.multiActorIds?.beekeeper;
-  } catch (err) {
-    console.error('[CAMERA] Hive authorization lookup failed:', err.message);
-    return false;
+  const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
+  if (!rows || rows.length === 0) {
+    // In development prototype without seed, allow fallback if specified
+    return process.env.NODE_ENV === 'development';
   }
+  const ownerId = rows[0].producer_id;
+  return ownerId === user.actorId || ownerId === user.multiActorIds?.beekeeper;
 }
 
 // Concurrency lock to prevent duplicate capture triggers
@@ -419,7 +414,17 @@ router.post('/capture', requireAuth, async (req, res) => {
   const hiveId = req.body?.hiveId || 'H-DEFAULT';
 
   // HC-025: Authorize hive ownership before triggering camera
-  const isAuthorized = await verifyHiveOwnership(hiveId, req.user);
+  let isAuthorized;
+  try {
+    isAuthorized = await verifyHiveOwnership(hiveId, req.user);
+  } catch (err) {
+    console.error('[CAMERA] Hive authorization lookup failed:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error verifying hive authorization.',
+      code: 'AUTHORIZATION_LOOKUP_FAILED',
+    });
+  }
   if (!isAuthorized) {
     return res.status(403).json({
       success: false,

@@ -148,18 +148,13 @@ async function verifyHiveAuthorization(hiveId, user) {
   if (roles.some((r) => ['kvic', 'admin', 'verifier'].includes(r))) {
     return true;
   }
-  try {
-    const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
-    if (!rows || rows.length === 0) {
-      // In development prototype without seed, allow fallback if specified
-      return process.env.NODE_ENV === 'development';
-    }
-    const ownerId = rows[0].producer_id;
-    return ownerId === user.actorId || ownerId === user.multiActorIds?.beekeeper;
-  } catch (err) {
-    console.error('[SENSORS] Hive authorization lookup failed:', err.message);
-    return false;
+  const { rows } = await pgQuery('SELECT producer_id FROM hives WHERE hive_id = $1', [hiveId]);
+  if (!rows || rows.length === 0) {
+    // In development prototype without seed, allow fallback if specified
+    return process.env.NODE_ENV === 'development';
   }
+  const ownerId = rows[0].producer_id;
+  return ownerId === user.actorId || ownerId === user.multiActorIds?.beekeeper;
 }
 
 // Device key authentication middleware
@@ -325,12 +320,21 @@ router.get('/stream', requireAuth, async (req, res) => {
 
   // Verify hive ownership
   if (hiveId) {
-    const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
-    if (!isAuthorized) {
-      return res.status(403).json({
+    try {
+      const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: You do not have permission to subscribe to telemetry for this hive.',
+          code: 'FORBIDDEN_HIVE_ACCESS',
+        });
+      }
+    } catch (err) {
+      console.error('[SENSORS] Hive authorization lookup failed:', err.message);
+      return res.status(500).json({
         success: false,
-        error: 'Forbidden: You do not have permission to subscribe to telemetry for this hive.',
-        code: 'FORBIDDEN_HIVE_ACCESS',
+        error: 'Internal server error verifying hive authorization.',
+        code: 'AUTHORIZATION_LOOKUP_FAILED',
       });
     }
   }
@@ -396,12 +400,21 @@ router.get('/latest', requireAuth, async (req, res) => {
   const { hiveId, deviceId } = req.query;
 
   if (hiveId) {
-    const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
-    if (!isAuthorized) {
-      return res.status(403).json({
+    try {
+      const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: You do not have permission to access telemetry for this hive.',
+          code: 'FORBIDDEN_HIVE_ACCESS',
+        });
+      }
+    } catch (err) {
+      console.error('[SENSORS] Hive authorization lookup failed:', err.message);
+      return res.status(500).json({
         success: false,
-        error: 'Forbidden: You do not have permission to access telemetry for this hive.',
-        code: 'FORBIDDEN_HIVE_ACCESS',
+        error: 'Internal server error verifying hive authorization.',
+        code: 'AUTHORIZATION_LOOKUP_FAILED',
       });
     }
   }
@@ -443,12 +456,21 @@ router.get('/history', requireAuth, async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
 
   if (hiveId) {
-    const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
-    if (!isAuthorized) {
-      return res.status(403).json({
+    try {
+      const isAuthorized = await verifyHiveAuthorization(hiveId, req.user);
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: You do not have permission to access telemetry history for this hive.',
+          code: 'FORBIDDEN_HIVE_ACCESS',
+        });
+      }
+    } catch (err) {
+      console.error('[SENSORS] Hive authorization lookup failed:', err.message);
+      return res.status(500).json({
         success: false,
-        error: 'Forbidden: You do not have permission to access telemetry history for this hive.',
-        code: 'FORBIDDEN_HIVE_ACCESS',
+        error: 'Internal server error verifying hive authorization.',
+        code: 'AUTHORIZATION_LOOKUP_FAILED',
       });
     }
   }
